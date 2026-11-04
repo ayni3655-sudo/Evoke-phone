@@ -1,6 +1,6 @@
 {
-  "name": "EVOKE",
-  "short_name": "EVOKE",
+  "name": "Evoke",
+  "short_name": "Evoke",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#fafafa",
