@@ -1,0 +1,16 @@
+{
+  "name": "EVOKE",
+  "short_name": "EVOKE",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#fafafa",
+  "theme_color": "#fafafa",
+  "icons": [
+    {
+      "src": "https://i.postimg.cc/7LW8JHkS/Image-1793324231029-701.jpg",
+      "sizes": "192x192 512x512",
+      "type": "image/jpeg",
+      "purpose": "any"
+    }
+  ]
+}
