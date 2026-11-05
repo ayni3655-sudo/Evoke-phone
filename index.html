@@ -6761,10 +6761,10 @@ chat: async function(messages, systemPrompt, charId) {
                 }
             };
             
-            // 劫持 AppNav 跳转，当进入 user 设置页时渲染列表
+            // 劫持 AppNav 跳转，当进入 user 设置页时渲染列表（保持 async/await 异步等待链条）
             const originalNavGoTo = AppNav.goTo;
-            AppNav.goTo = function(pageId) {
-                originalNavGoTo.call(AppNav, pageId);
+            AppNav.goTo = async function(pageId) {
+                await originalNavGoTo.call(AppNav, pageId);
                 if (pageId === 'page-set-user') window.UserSys.renderList();
             };
         </script>
@@ -12194,7 +12194,7 @@ if (badgeEl) {
                         </div>
                         <div class="mem-cat-info">
                             <div class="mem-cat-title">聊天记忆</div>
-                            <div class="mem-cat-desc">微信日常对话提炼的关键事件与主线大总结</div>
+                            <div class="mem-cat-desc">聊天对话提炼的关键事件</div>
                         </div>
                         <div class="mem-cat-badge" id="mem-cat-count-chat">0 条</div>
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#c7c7cc" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
@@ -12207,7 +12207,7 @@ if (badgeEl) {
                         </div>
                         <div class="mem-cat-info">
                             <div class="mem-cat-title">剧情记忆</div>
-                            <div class="mem-cat-desc" id="mem-cat-desc-story">与所绑定剧本实时双向同步的章节记忆</div>
+                            <div class="mem-cat-desc" id="mem-cat-desc-story">与绑定剧本同步的章节记忆</div>
                         </div>
                         <div class="mem-cat-badge" id="mem-cat-count-story">未绑定</div>
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#c7c7cc" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
@@ -12220,7 +12220,7 @@ if (badgeEl) {
                         </div>
                         <div class="mem-cat-info">
                             <div class="mem-cat-title">其他记忆</div>
-                            <div class="mem-cat-desc">直播间互动归档与跨平台特殊事件记录</div>
+                            <div class="mem-cat-desc">跨平台特殊事件记录</div>
                         </div>
                         <div class="mem-cat-badge" id="mem-cat-count-other">0 条</div>
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#c7c7cc" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
@@ -29343,7 +29343,7 @@ ${chronologicalContext || '日常生活状态。'}
                     <div class="story-set-item" onclick="window.StoryApp.toggleSetExp('st-exp-memory-cross')">
                         <div class="story-set-main"><div class="story-set-title"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8e8e8e" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg> 跨界记忆联动</div><div class="story-set-val"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6"></polyline></svg></div></div>
                         <div class="story-set-exp" id="st-exp-memory-cross" onclick="event.stopPropagation()">
-                            <div style="font-size:12px; color:#8e8e8e; margin:10px 0 8px 0; line-height:1.5;">开启并勾选需要跨界读取的外部记忆源与读取条数：</div>
+                            <div style="font-size:12px; color:#8e8e8e; margin:10px 0 8px 0; line-height:1.5;">开启并勾选需要跨界读取的外部记忆与读取条数：</div>
 
                             <!-- 1. 联动其他剧本（多选） -->
                             <div style="background:#f9f9fb; border-radius:10px; padding:10px 12px; border:1px solid #efefef; margin-bottom:10px;">
@@ -29383,25 +29383,22 @@ ${chronologicalContext || '日常生活状态。'}
                                 </div>
                             </div>
 
-                            <!-- 3. 联动微博与直播 -->
-                            <div style="background:#f9f9fb; border-radius:10px; padding:6px 12px; border:1px solid #efefef;">
-                                <div class="story-set-input-row" style="padding:8px 0;">
-                                    <label style="display:flex; align-items:center; gap:8px; font-size:13.5px; font-weight:600; color:#262626; cursor:pointer;">
-                                        <input type="checkbox" id="st-link-weibo" style="width:15px; height:15px; accent-color:#262626;"> 联动微博动态
+                            <!-- 3. 联动其他记忆（多选角色，仅主角无NPC） -->
+                            <div style="background:#f9f9fb; border-radius:10px; padding:10px 12px; border:1px solid #efefef;">
+                                <div style="display:flex; justify-content:space-between; align-items:center;">
+                                    <span style="font-size:13.5px; font-weight:600; color:#262626;">联动其他记忆</span>
+                                    <label class="wb-toggle">
+                                        <input type="checkbox" id="st-link-other" onchange="document.getElementById('st-other-link-box').style.display=this.checked?'flex':'none'">
+                                        <span class="wb-toggle-slider"></span>
                                     </label>
-                                    <div style="display:flex; align-items:center; gap:6px;">
-                                        <span style="font-size:12px; color:#8e8e8e;">条数</span>
-                                        <textarea id="st-link-weibo-c" class="ins-single-textarea" style="width:54px; height:28px; line-height:16px; text-align:center;" rows="1" placeholder="5">5</textarea>
-                                    </div>
                                 </div>
-                                <div class="story-set-input-row" style="border:none; padding:8px 0;">
-                                    <label style="display:flex; align-items:center; gap:8px; font-size:13.5px; font-weight:600; color:#262626; cursor:pointer;">
-                                        <input type="checkbox" id="st-link-live" style="width:15px; height:15px; accent-color:#262626;"> 联动直播记忆
-                                    </label>
-                                    <div style="display:flex; align-items:center; gap:6px;">
-                                        <span style="font-size:12px; color:#8e8e8e;">条数</span>
-                                        <textarea id="st-link-live-c" class="ins-single-textarea" style="width:54px; height:28px; line-height:16px; text-align:center;" rows="1" placeholder="5">5</textarea>
+                                <div id="st-other-link-box" style="display:none; flex-direction:column; gap:8px; margin-top:10px; padding-top:10px; border-top:0.5px dashed #e5e5ea;">
+                                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                                        <span style="font-size:12.5px; color:#555;">读取其他记忆条数(条):</span>
+                                        <textarea id="st-link-other-c" class="ins-single-textarea" style="width:60px; height:28px; line-height:16px; text-align:center;" rows="1" placeholder="5">5</textarea>
                                     </div>
+                                    <div style="font-size:12px; color:#8e8e8e; margin-top:2px;">勾选要联动其他记忆的角色 (多选):</div>
+                                    <div id="st-other-checkboxes" style="max-height:150px; overflow-y:auto; background:#fff; border:1px solid #e5e5ea; border-radius:8px; padding:4px 10px;"></div>
                                 </div>
                             </div>
                         </div>
@@ -34246,15 +34243,16 @@ ${chronologicalContext || '日常生活状态。'}
                             });
                         }
                     }
-                    if (s.linkWeibo && s.linkWeiboCount > 0 && appData.weibo) {
-                        let wbs = (appData.weibo.homePosts ? appData.weibo.homePosts.filter(p => !p.isRecom) : []).slice(0, s.linkWeiboCount);
-                        if (wbs.length) linkPrompt += `\n[微博动态]: ` + wbs.map(m => `[${m.name}]: ${m.content}`).join(' | ');
-                    }
-                    if (s.linkLive && s.linkLiveCount > 0 && appData.live) {
-                        let liveHistories = (appData.live.history ? appData.live.history : []);
-                        let storyCharNames = chars.map(c => c.name);
-                        let filteredLives = liveHistories.filter(h => storyCharNames.includes(h.host)).slice(0, s.linkLiveCount);
-                        if (filteredLives.length) linkPrompt += `\n[直播历史档案]: ` + filteredLives.map(h => `[${h.host}]: ${h.text}`).join(' | ');
+                    if (s.linkOther && s.linkOtherCount > 0) {
+                        let otherCharIds = s.linkOtherCharIds || [];
+                        let targetOtherChars = (appData.charCards || []).filter(c => !c.isNPC && otherCharIds.includes(c.id));
+                        targetOtherChars.forEach(c => {
+                            if (c.otherMemories && c.otherMemories.length > 0) {
+                                let oms = c.otherMemories.slice(0, s.linkOtherCount);
+                                let lines = oms.map(om => `[${om.appName || '其他'} (${om.dateStr || ''} ${om.timeStr || ''})]: ${om.content}`);
+                                if (lines.length) linkPrompt += `\n[${c.name}的其他记忆]: ` + lines.join(' | ');
+                            }
+                        });
                     }
                     if (linkPrompt && linkPrompt.trim()) {
                         breakdown.push({ name: '跨界联动记忆', content: linkPrompt.trim() });
@@ -34972,8 +34970,6 @@ ${storyTextRule}
                         // 跨界联动安全浅拷贝预载：按需补载所挂载的业务分区，使用 .slice() 纯拷贝，绝不修改、剪切或影响原应用记录
                         const linkPartitions = [];
                         if (s.linkChat) linkPartitions.push(window.ensurePartitionLoaded('chats'));
-                        if (s.linkWeibo) linkPartitions.push(window.ensurePartitionLoaded('weibo'));
-                        if (s.linkLive) linkPartitions.push(window.ensurePartitionLoaded('live'));
                         if (linkPartitions.length > 0) await Promise.all(linkPartitions);
 
                         let linkPrompt = '';
@@ -35003,15 +34999,22 @@ ${storyTextRule}
                                 });
                             }
                         }
-                        if (s.linkWeibo && s.linkWeiboCount > 0 && appData.weibo) {
-                            let wbs = (appData.weibo.homePosts ? appData.weibo.homePosts.filter(p => !p.isRecom) : []).slice(0, s.linkWeiboCount);
-                            if (wbs.length) linkPrompt += `\n[微博动态]: ` + wbs.map(m => `[${m.name}]: ${m.content}`).join(' | ');
-                        }
-                        if (s.linkLive && s.linkLiveCount > 0 && appData.live) {
-                            let liveHistories = (appData.live.history ? appData.live.history : []);
-                            let storyCharNames = chars.map(c => c.name);
-                            let filteredLives = liveHistories.filter(h => storyCharNames.includes(h.host)).slice(0, s.linkLiveCount);
-                            if(filteredLives.length) linkPrompt += `\n[直播历史档案]: ` + filteredLives.map(h => `[${h.host}]: ${h.text}`).join(' | ');
+                        if (s.linkOther && s.linkOtherCount > 0) {
+                            let otherCharIds = s.linkOtherCharIds || [];
+                            let targetOtherChars = (appData.charCards || []).filter(c => !c.isNPC && otherCharIds.includes(c.id));
+                            if (targetOtherChars.length > 0) {
+                                let otherLines = [];
+                                targetOtherChars.forEach(c => {
+                                    if (c.otherMemories && c.otherMemories.length > 0) {
+                                        let oms = c.otherMemories.slice(0, s.linkOtherCount);
+                                        let lines = oms.map(om => `[${om.appName || '其他'} (${om.dateStr || ''} ${om.timeStr || ''})]: ${om.content}`);
+                                        if (lines.length) otherLines.push(`【${c.name}的其他记忆】：` + lines.join(' | '));
+                                    }
+                                });
+                                if (otherLines.length > 0) {
+                                    linkPrompt += `\n[角色其他记忆联动]:\n` + otherLines.join('\n') + '\n';
+                                }
+                            }
                         }
                         if (linkPrompt) linkPrompt = `\n【背景参考信息】：以下是角色在其他社交平台的互动记录。\n【核心剧情法则】：如果最新的剧情记录中出现了“[系统提示]: 话题已引接至聊天”的标记，这意味着【之前的小说剧情已在此处彻底终结】！你必须终止前面的小说剧情，立刻参考最新聊天记录中的事件开启一段全新的小说叙事。根据聊天记录中最新的对话和事件，直接转化为小说中的下一步情节（例如：如果聊天里大家准备出门，你就描写角色们出门了）。若无系统提示则聊天记录仅作为隐藏背景供参考，请聚焦并继续当前小说剧情。${linkPrompt}`;
 
@@ -37220,8 +37223,32 @@ ${storyTextRule}
                                 window.renderLazyAvatarBatch('#st-chat-checkboxes', 'data-lazy-avatar', 10, 16);
                             }
 
-                            document.getElementById('st-link-weibo').checked = s.linkWeibo || false; document.getElementById('st-link-weibo-c').value = s.linkWeiboCount || 5;
-                            document.getElementById('st-link-live').checked = s.linkLive || false; s.linkLiveCount = document.getElementById('st-link-live-c').value = s.linkLiveCount || 5;
+                            if (document.getElementById('st-link-other')) {
+                                document.getElementById('st-link-other').checked = s.linkOther || false;
+                                document.getElementById('st-link-other-c').value = s.linkOtherCount || 5;
+                                const otherLinkBox = document.getElementById('st-other-link-box');
+                                if (otherLinkBox) otherLinkBox.style.display = s.linkOther ? 'flex' : 'none';
+
+                                let otherCheckboxes = '';
+                                let linkedOtherCharIds = s.linkOtherCharIds || [];
+                                const mainChars = (appData.charCards || []).filter(c => !c.isNPC);
+                                mainChars.forEach(c => {
+                                    let checked = linkedOtherCharIds.includes(c.id) ? 'checked' : '';
+                                    let thumb = c.avatarThumb || c.avatar || '';
+                                    let otherMemCount = (c.otherMemories || []).length;
+                                    otherCheckboxes += `<label style="display:flex; align-items:center; gap:10px; padding:7px 0; border-bottom:0.5px dashed #f0f0f0; font-size:13px; color:#262626; cursor:pointer; margin:0;">
+                                        <input type="checkbox" class="st-link-other-cb" value="${c.id}" ${checked} style="width:15px; height:15px; accent-color:#262626; flex-shrink:0;">
+                                        <div data-lazy-avatar="${thumb}" style="width:28px; height:28px; border-radius:50%; background-color:#f0f0f0; background-size:cover; background-position:center; flex-shrink:0; border:0.5px solid #efefef;"></div>
+                                        <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:500;">${c.name || '未命名角色'}</span>
+                                        <span style="color:#8e8e8e; font-size:10.5px; background:#f5f5f7; padding:2px 6px; border-radius:4px; flex-shrink:0;">${otherMemCount}条</span>
+                                    </label>`;
+                                });
+                                const otCheckCtn = document.getElementById('st-other-checkboxes');
+                                if (otCheckCtn) {
+                                    otCheckCtn.innerHTML = otherCheckboxes || '<div style="padding:10px; text-align:center; color:#8e8e8e; font-size:12px;">暂无主角角色</div>';
+                                    window.renderLazyAvatarBatch('#st-other-checkboxes', 'data-lazy-avatar', 10, 16);
+                                }
+                            }
                         }
                     }
                     // 方案设置列表初始化渲染
@@ -37354,8 +37381,11 @@ ${storyTextRule}
                             s.linkChatCount = parseInt(document.getElementById('st-link-chat-c').value)||10;
                             s.linkChatIds = Array.from(document.querySelectorAll('.st-link-chat-cb:checked')).map(el => el.value);
 
-                            s.linkWeibo = document.getElementById('st-link-weibo').checked; s.linkWeiboCount = parseInt(document.getElementById('st-link-weibo-c').value)||5;
-                            s.linkLive = document.getElementById('st-link-live').checked; s.linkLiveCount = parseInt(document.getElementById('st-link-live-c').value)||5;
+                            if (document.getElementById('st-link-other')) {
+                                s.linkOther = document.getElementById('st-link-other').checked;
+                                s.linkOtherCount = parseInt(document.getElementById('st-link-other-c').value) || 5;
+                                s.linkOtherCharIds = Array.from(document.querySelectorAll('.st-link-other-cb:checked')).map(el => el.value);
+                            }
                         }
                     }
                     
@@ -37515,10 +37545,11 @@ ${storyTextRule}
                             s.linkChatCount = parseInt(document.getElementById('st-link-chat-c').value) || 10;
                             s.linkChatIds = Array.from(document.querySelectorAll('.st-link-chat-cb:checked')).map(el => el.value);
 
-                            s.linkWeibo = document.getElementById('st-link-weibo').checked;
-                            s.linkWeiboCount = parseInt(document.getElementById('st-link-weibo-c').value) || 5;
-                            s.linkLive = document.getElementById('st-link-live').checked;
-                            s.linkLiveCount = parseInt(document.getElementById('st-link-live-c').value) || 5;
+                            if (document.getElementById('st-link-other')) {
+                                s.linkOther = document.getElementById('st-link-other').checked;
+                                s.linkOtherCount = parseInt(document.getElementById('st-link-other-c').value) || 5;
+                                s.linkOtherCharIds = Array.from(document.querySelectorAll('.st-link-other-cb:checked')).map(el => el.value);
+                            }
                         }
                     }
                     if(document.getElementById('st-set-text-size')) {
@@ -42037,19 +42068,14 @@ setTimeout(() => { if (window.EssaySys) window.EssaySys.safeInit(); }, 1500);
 
     .live-home-list { 
     flex: 1; 
+    min-height: 0;
     display: grid; 
-    grid-template-columns: repeat(2, 1fr); 
-    /* 核心修改：删除 grid-template-rows，改为自动行高 */
-    grid-auto-rows: min-content; 
-    /* 核心修改：开启垂直滚动 */
-    overflow-y: auto; 
-    gap: 10px 12px; 
-
-    padding: 12px 12px 72px 12px; 
-    
+    grid-template-columns: repeat(2, minmax(0, 1fr)); 
+    grid-template-rows: repeat(5, minmax(0, 1fr)); 
+    overflow: hidden; 
+    gap: clamp(6px, 1.2vh, 12px) clamp(8px, 2.8vw, 14px); 
+    padding: clamp(6px, 1.2vh, 12px) clamp(10px, 3vw, 14px) calc(55px + env(safe-area-inset-bottom, 0px) + clamp(6px, 1vh, 10px)) clamp(10px, 3vw, 14px); 
     box-sizing: border-box; 
-    /* 解决部分手机端滑动不顺畅的问题 */
-    -webkit-overflow-scrolling: touch; 
 }
     
     .live-item-wrap {
@@ -42057,61 +42083,52 @@ setTimeout(() => { if (window.EssaySys) window.EssaySys.safeInit(); }, 1500);
     flex-direction: column;
     cursor: pointer;
     width: 100%;
-    /* 1. 恢复你的 3/1.7 锁定纵横比，彻底解决 Grid 容器高度坍塌冲突 */
-    aspect-ratio: 3 / 1.7; 
-    background: transparent; /* 去掉白背景 */
+    height: 100%;
+    min-height: 0;
+    background: transparent;
     border-radius: 12px;
-    /* 2. 必须为 visible，允许文字悬浮在卡片下方 */
-    overflow: visible; 
-    box-shadow: none; /* 去掉外层阴影，由内部的 .live-card 展现卡片投影 */
+    overflow: hidden; 
+    box-shadow: none;
     position: relative;
     transition: transform 0.2s;
-    flex-shrink: 0; /* 防止被挤压 */
-    /* 3. 核心新增：向下撑开 28px 的外边距空间，刚好容纳简介文字，防止与下一行重叠 */
-    margin-bottom: 18px; 
+    margin: 0; 
 }
     .live-item-wrap:active { transform: scale(0.96); }
     
     .live-card { 
     position: relative; 
     width: 100%; 
-    /* 将物理外观属性移到此处 */
-    aspect-ratio: 3 / 1.7; 
-    border-radius: 12px;
+    flex: 1;
+    min-height: 0;
+    border-radius: 10px;
     overflow: hidden;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.04);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.04);
     display: block;
 }
     
     .live-card-bg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center 20%; background-repeat: no-repeat; z-index: 0; }
-    .live-card-mask { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0) 30%, rgba(0,0,0,0.4) 100%); z-index: 1; }
+    .live-card-mask { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0) 30%, rgba(0,0,0,0.45) 100%); z-index: 1; }
     
-    .live-card-badge { position: absolute; top: 6px; left: 6px; background: linear-gradient(90deg, #fb7299, #f8a1b6); font-size: 10px; color: #fff; padding: 2px 6px; border-radius: 6px; z-index: 2; display: flex; align-items: center; gap: 4px; box-shadow: 0 2px 4px rgba(251,114,153,0.3); font-weight: 600; }
+    .live-card-badge { position: absolute; top: 5px; left: 5px; background: linear-gradient(90deg, #fb7299, #f8a1b6); font-size: clamp(9px, 1.2vh, 10px); color: #fff; padding: 2px 6px; border-radius: 6px; z-index: 2; display: flex; align-items: center; gap: 4px; box-shadow: 0 2px 4px rgba(251,114,153,0.3); font-weight: 600; }
     .live-card-badge .dot { width: 4px; height: 4px; background: #fff; border-radius: 50%; animation: pulse 1.5s infinite; }
     
-    .live-card-viewers { position: absolute; top: 6px; right: 6px; font-size: 10px; color: #fff; background: rgba(0,0,0,0.4); padding: 2px 6px; border-radius: 6px; z-index: 2; display: flex; align-items: center; gap: 4px; }
-    .live-card-name { position: absolute; bottom: 0; left: 0; width: 100%; padding: 6px 8px; font-size: 13px; font-weight: 600; color: #fff; z-index: 2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
+    .live-card-viewers { position: absolute; top: 5px; right: 5px; font-size: clamp(9px, 1.2vh, 10px); color: #fff; background: rgba(0,0,0,0.4); padding: 2px 6px; border-radius: 6px; z-index: 2; display: flex; align-items: center; gap: 4px; }
+    .live-card-name { position: absolute; bottom: 0; left: 0; width: 100%; padding: 4px 8px; font-size: clamp(11px, 1.5vh, 13px); font-weight: 600; color: #fff; z-index: 2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px rgba(0,0,0,0.5); box-sizing: border-box; }
     
     .live-card-title-under { 
     flex-shrink: 0;
     display: block;
     width: 100%;
-    /* 去掉背景色，调整间距 */
-    padding: 4px 4px 2px 4px; 
-    font-size: 12px; 
+    padding: clamp(2px, 0.5vh, 5px) 4px 0 4px; 
+    font-size: clamp(10.5px, 1.35vh, 12px); 
     color: #75757a; 
     background: transparent; 
     font-weight: 500;
-    line-height: 1.4;
+    line-height: 1.3;
     white-space: nowrap; 
     overflow: hidden; 
     text-overflow: ellipsis; 
     box-sizing: border-box; 
-    
-    /* 4. 核心新增：通过绝对定位，让文字脱离弹性盒流，精准悬浮在 3/2 卡片的外下方 */
-    position: absolute;
-    top: 100%;
-    left: 0;
 }
 
     @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
@@ -42642,10 +42659,10 @@ setTimeout(() => { if (window.EssaySys) window.EssaySys.safeInit(); }, 1500);
                     <div style="font-size:14px; color:#99a2aa; line-height:1.5;">确定要刷新首页推荐内容吗？</div>
                 </div>
                 <div style="display:flex; border-top:0.5px solid #eee;">
-                    <!-- 确定按钮挪到了左边 -->
-                    <div onclick="document.getElementById('live-refresh-confirm-box').style.transform='scale(0.9)'; setTimeout(()=>document.getElementById('live-refresh-confirm-modal').style.display='none',200); LiveSys.refreshHome();" style="flex:1; padding:14px 0; text-align:center; font-size:16px; color:var(--live-theme); font-weight:600; border-right:0.5px solid #eee; cursor:pointer;">确定</div>
-                    <!-- 取消按钮挪到了右边 -->
-                    <div onclick="document.getElementById('live-refresh-confirm-box').style.transform='scale(0.9)'; setTimeout(()=>document.getElementById('live-refresh-confirm-modal').style.display='none',200);" style="flex:1; padding:14px 0; text-align:center; font-size:16px; color:#555; cursor:pointer;">取消</div>
+                    <!-- 取消按钮在左边 -->
+                    <div onclick="document.getElementById('live-refresh-confirm-box').style.transform='scale(0.9)'; setTimeout(()=>document.getElementById('live-refresh-confirm-modal').style.display='none',200);" style="flex:1; padding:14px 0; text-align:center; font-size:16px; color:#555; border-right:0.5px solid #eee; cursor:pointer;">取消</div>
+                    <!-- 确定按钮在右边 -->
+                    <div onclick="document.getElementById('live-refresh-confirm-box').style.transform='scale(0.9)'; setTimeout(()=>document.getElementById('live-refresh-confirm-modal').style.display='none',200); LiveSys.refreshHome();" style="flex:1; padding:14px 0; text-align:center; font-size:16px; color:var(--live-theme); font-weight:600; cursor:pointer;">确定</div>
                 </div>
             </div>
         </div>
@@ -42738,11 +42755,11 @@ setTimeout(() => { if (window.EssaySys) window.EssaySys.safeInit(); }, 1500);
             if (window.AIEngine && window.AIEngine.preloadCharMemoryPartitions) {
                 await window.AIEngine.preloadCharMemoryPartitions(this.data.settings.allowedChars || []);
             }
-            this.activeMainView = 'home';
-            this.switchMainView('home');
-            const homeList = document.getElementById('wb-home-list');
-            if (homeList) homeList.scrollTop = 0;
-            this.processPendingImages();
+            if (this.activeView === 'room' && this.roomCtx) {
+                this.switchView('room');
+            } else {
+                this.switchView('home');
+            }
         },
 
         switchView: function(view) {
@@ -42750,11 +42767,14 @@ setTimeout(() => { if (window.EssaySys) window.EssaySys.safeInit(); }, 1500);
             document.querySelectorAll('.live-view').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.live-dock-item').forEach(el => el.classList.remove('active'));
             
-            document.getElementById('live-view-' + view).classList.add('active');
+            const viewEl = document.getElementById('live-view-' + view);
+            if (viewEl) viewEl.classList.add('active');
             const nav = document.getElementById('live-nav-' + view);
-            if(nav) nav.classList.add('active');
+            if (nav) nav.classList.add('active');
             
-            if (view === 'settings') this.renderSettings();
+            if (view === 'home') this.renderHome();
+            else if (view === 'settings') this.renderSettings();
+            else if (view === 'start') this.renderSettings();
         },
 
         showToast: function(msg) {
@@ -42963,6 +42983,7 @@ B类（虚拟NPC）：请再额外生成 ${npcCount} 个随机的才艺/游戏/�
             }
 
             this.data.homeList = list.sort(() => 0.5 - Math.random());
+            saveLiveData();
             saveGlobalData(); 
             this.renderHome();
             this.hideGlobalLoading('首页刷新成功');
@@ -46953,31 +46974,74 @@ ${modelReply}
 <div id="modal-wx-pendant-select" class="ins-modal" style="z-index: 310; background:rgba(0,0,0,0.5); display:none;">
     <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:#fff; border-radius:16px; width:90%; max-width:360px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,0.2);">
         <div style="padding:16px; display:flex; justify-content:space-between; align-items:center; border-bottom:0.5px solid #f0f0f0;">
-            <div style="width:60px;"></div> <!-- 占位元素保持标题居中 -->
+            <div style="width:60px; display:flex; align-items:center;">
+                <div onclick="document.getElementById('modal-wx-pendant-select').style.display='none'; WeChatSys.isPendantDelMode=false;" style="cursor:pointer; color:#8e8e8e; display:flex; align-items:center; padding:2px;">
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </div>
+            </div>
             <div style="font-size:16px; font-weight:700; color:#262626; flex:1; text-align:center;">仅适配圆形头像</div>
             <div style="display:flex; gap:16px; width:60px; justify-content:flex-end; align-items:center;">
-                <!-- 核心修复：补充了 id="wx-pendant-del-icon" -->
                 <div id="wx-pendant-del-icon" onclick="WeChatSys.togglePendantDeleteMode()" style="cursor:pointer; color:#ff3b30; display:flex; align-items:center;">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                 </div>
-                <!-- 核心修复：补充了 id="wx-pendant-upload-icon" -->
                 <div id="wx-pendant-upload-icon" onclick="WeChatSys.openPendantUpload()" style="cursor:pointer; color:#07c160; display:flex; align-items:center;">
                     <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
                 </div>
             </div>
         </div>
-        <div id="wx-pendant-grid" style="padding:16px; display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; max-height:55vh; overflow-y:auto; background:#f9f9f9;">
+        <div id="wx-pendant-grid" style="padding:16px; display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; max-height:60vh; overflow-y:auto; background:#f9f9f9;">
             <!-- 动态渲染挂件列表 -->
         </div>
-        <!-- 正常模式底部按钮 -->
-        <div id="wx-pendant-normal-bar" style="display:flex; border-top:0.5px solid #f0f0f0; background:#fff;">
-            <div onclick="document.getElementById('modal-wx-pendant-select').style.display='none'; WeChatSys.isPendantDelMode=false;" style="flex:1; padding:14px; text-align:center; color:#8e8e8e; cursor:pointer; font-size:15px; border-right:0.5px solid #f0f0f0;">取消</div>
-            <div onclick="WeChatSys.savePendant()" style="flex:1; padding:14px; text-align:center; color:#07c160; font-size:15px; font-weight:600; cursor:pointer;">保存</div>
-        </div>
+        <!-- 正常模式隐藏底部栏 -->
+        <div id="wx-pendant-normal-bar" style="display:none;"></div>
         <!-- 删除模式底部按钮 -->
         <div id="wx-pendant-del-bar" style="display:none; border-top:0.5px solid #f0f0f0; background:#fff;">
             <div onclick="WeChatSys.togglePendantDeleteMode()" style="flex:1; padding:14px; text-align:center; color:#8e8e8e; cursor:pointer; font-size:15px; border-right:0.5px solid #f0f0f0;">取消</div>
             <div onclick="WeChatSys.confirmDeletePendants()" style="flex:1; padding:14px; text-align:center; color:#ff3b30; font-size:15px; font-weight:600; cursor:pointer;">删除</div>
+        </div>
+    </div>
+</div>
+
+<!-- 头像挂件预览与微调弹窗 -->
+<div id="modal-wx-pendant-adjust" class="ins-modal" style="z-index: 330; background:rgba(0,0,0,0.55); display:none;">
+    <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:#fff; border-radius:20px; width:88%; max-width:340px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 12px 40px rgba(0,0,0,0.25);">
+        <div style="padding:16px 18px; display:flex; justify-content:space-between; align-items:center; border-bottom:0.5px solid #f0f0f0;">
+            <div style="width:48px;"></div>
+            <div style="font-size:16px; font-weight:700; color:#1a1a1a; text-align:center;">调整挂件位置</div>
+            <div onclick="WeChatSys.resetPendantAdjust()" style="width:48px; text-align:right; font-size:13px; color:#576b95; cursor:pointer; font-weight:500;">重置</div>
+        </div>
+        <div style="padding:28px 20px 20px; display:flex; flex-direction:column; align-items:center; background:#fafafa; border-bottom:0.5px solid #f0f0f0;">
+            <div id="wx-pendant-adj-avatar" style="position:relative; width:76px; height:76px; border-radius:50%; background-size:cover; background-position:center; background-color:#fff; box-shadow:0 2px 10px rgba(0,0,0,0.08);">
+                <div id="wx-pendant-adj-layer" style="position:absolute; background-position:center; background-repeat:no-repeat; pointer-events:none; z-index:2;"></div>
+            </div>
+            <div style="font-size:11px; color:#999; margin-top:18px;">拖动下方滑块微调挂件大小与偏移</div>
+        </div>
+        <div style="padding:18px 20px; display:flex; flex-direction:column; gap:16px; background:#fff;">
+            <div style="display:flex; flex-direction:column; gap:6px;">
+                <div style="display:flex; justify-content:space-between; font-size:13px; color:#262626; font-weight:500;">
+                    <span>缩放大小</span>
+                    <span id="wx-pendant-adj-scale-val" style="color:#8e8e8e; font-family:monospace;">135%</span>
+                </div>
+                <input type="range" id="wx-pendant-adj-scale" min="80" max="220" step="1" value="135" style="width:100%; accent-color:#07c160;" oninput="WeChatSys.onPendantAdjustInput()">
+            </div>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+                <div style="display:flex; justify-content:space-between; font-size:13px; color:#262626; font-weight:500;">
+                    <span>左右移动</span>
+                    <span id="wx-pendant-adj-x-val" style="color:#8e8e8e; font-family:monospace;">0%</span>
+                </div>
+                <input type="range" id="wx-pendant-adj-x" min="-60" max="60" step="1" value="0" style="width:100%; accent-color:#07c160;" oninput="WeChatSys.onPendantAdjustInput()">
+            </div>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+                <div style="display:flex; justify-content:space-between; font-size:13px; color:#262626; font-weight:500;">
+                    <span>上下移动</span>
+                    <span id="wx-pendant-adj-y-val" style="color:#8e8e8e; font-family:monospace;">0%</span>
+                </div>
+                <input type="range" id="wx-pendant-adj-y" min="-60" max="60" step="1" value="0" style="width:100%; accent-color:#07c160;" oninput="WeChatSys.onPendantAdjustInput()">
+            </div>
+        </div>
+        <div style="display:flex; border-top:0.5px solid #f0f0f0; background:#fff;">
+            <div onclick="document.getElementById('modal-wx-pendant-adjust').style.display='none'" style="flex:1; padding:14px; text-align:center; color:#8e8e8e; cursor:pointer; font-size:15px; border-right:0.5px solid #f0f0f0;">取消</div>
+            <div onclick="WeChatSys.savePendant()" style="flex:1; padding:14px; text-align:center; color:#07c160; font-size:15px; font-weight:600; cursor:pointer;">保存</div>
         </div>
     </div>
 </div>
@@ -47334,72 +47398,65 @@ ${modelReply}
             if(this.currentPromptAction) this.currentPromptAction(document.getElementById('wx-prompt-input').value);
         },
 
-        // [新增] 智能计算头像挂件的宽高与居中偏移量
-        getPendantStyle: function(url) {
-            // 默认的基础值 (兼容老款 768x768)
+        // [新增] 解析挂件默认基础尺寸与居中偏移量
+        getDefaultPendantMetrics: function(url) {
             let w = 120, h = 120, top = -10, left = -10;
+            if (!url || typeof url !== 'string') return { scale: w, offsetX: 0, offsetY: 0 };
 
             let match = url.match(/dim=(\d+)x(\d+)/);
             if (match) {
                 let pw = parseInt(match[1]), ph = parseInt(match[2]);
-
-                // ▼▼▼ 在这里手动微调各大尺寸的挂件！ ▼▼▼
-                // w 和 h 代表放大比例 (100是正好塞满，138就是放大到138%)
-                // top 代表上下移动 (负数越小，图片越往上移)
-                // left 代表左右移动 (负数越小，图片越往左移)
-
                 if (pw === 250 && ph === 268) {
-                    w = 135;    // 宽度缩放比例
-                    h = 135;    // 强制把高度压成和宽度一样，解决椭圆变形问题
-                    top = -27;  // ★ 手动往上挪！原来自动算是 -19，现在改成 -25 就往上走了。如果还不够上，改成 -28 试试！
-                    left = -19; // 左右居中 (-19)
-                }
-                else if (pw === 352 && ph === 352) {
+                    w = 135; h = 135; top = -27; left = -19;
+                } else if (pw === 352 && ph === 352) {
                     w = 146; h = 146; top = -23; left = -23;
-                }
-                else if (pw === 606 && ph === 714) {
-                    w = 136; h = 136; top = -24; left = -18; // 606 的图头部留白也多，顺便帮你往上提了一点 (-24)
-                }
-                else if (pw === 210 && ph === 225) {
+                } else if (pw === 606 && ph === 714) {
+                    w = 136; h = 136; top = -24; left = -18;
+                } else if (pw === 210 && ph === 225) {
                     w = 142; h = 142; top = -26; left = -21;
-                }
-                else if (pw === 192 && ph === 202) {
+                } else if (pw === 192 && ph === 202) {
                     w = 138; h = 138; top = -23; left = -19;
-                }
-                else if (pw === 210 && ph === 210) {
+                } else if (pw === 210 && ph === 210) {
                     w = 142; h = 142; top = -21; left = -21;
-                }
-                else {
-                    // 未知尺寸的自动计算公式兜底
+                } else {
                     let hole = pw * 0.73;
-                    w = (pw / hole) * 100;
+                    w = Math.round((pw / hole) * 100);
                     h = w;
                     top = -(h - 100) / 2;
                     left = -(w - 100) / 2;
                 }
             }
 
-            // ▼▼▼ 独家开小灶：如果某一张特定的图片留白实在太奇葩，用上面统一的尺寸调不好，可以在这里单独针对它调 ▼▼▼
-            if (url.includes("182.gif")) {
-                w = 135; h = 135; top = -20; left = -19;
-            }
-            if (url.includes("226.gif")) {
-                w = 132; h = 132; top = -24; left = -12;
-            }
-            if (url.includes("ws.PNG")) {
-                w = 132; h = 132; top = -27; left = -15;
-            }
-            if (url.includes("161.PNG")) {
-                w = 128; h = 128; top = -27; left = -19;
-            }
-            if (url.includes("162.PNG")) {
-                w = 128; h = 128; top = -27; left = -19;
-            }
-            if (url.includes("2026-03-18-140235.png")) {
-                w = 120; h = 120; top = -9; left = -10; // top 从原来的 -10 改为 -9（数值变大即往下移动）
-            }
+            if (url.includes("182.gif")) { w = 135; h = 135; top = -20; left = -19; }
+            if (url.includes("226.gif")) { w = 132; h = 132; top = -24; left = -12; }
+            if (url.includes("ws.PNG")) { w = 132; h = 132; top = -27; left = -15; }
+            if (url.includes("161.PNG")) { w = 128; h = 128; top = -27; left = -19; }
+            if (url.includes("162.PNG")) { w = 128; h = 128; top = -27; left = -19; }
+            if (url.includes("2026-03-18-140235.png")) { w = 120; h = 120; top = -9; left = -10; }
 
-            return `width:${w}%; height:${h}%; top:${top}%; left:${left}%; background-size:100% 100%;`;
+            let centerTop = -(w - 100) / 2;
+            let centerLeft = -(w - 100) / 2;
+            let offsetY = Math.round(top - centerTop);
+            let offsetX = Math.round(left - centerLeft);
+            return { scale: Math.round(w), offsetX: offsetX, offsetY: offsetY };
+        },
+
+        // [新增] 智能计算头像挂件的宽高与居中偏移量（支持自定义滑块配置）
+        getPendantStyle: function(pendantData) {
+            if (!pendantData) return '';
+            if (typeof pendantData === 'object' && pendantData.url) {
+                let scale = pendantData.scale !== undefined ? parseFloat(pendantData.scale) : 135;
+                let offsetX = pendantData.offsetX !== undefined ? parseFloat(pendantData.offsetX) : 0;
+                let offsetY = pendantData.offsetY !== undefined ? parseFloat(pendantData.offsetY) : 0;
+                let top = -(scale - 100) / 2 + offsetY;
+                let left = -(scale - 100) / 2 + offsetX;
+                return `width:${scale}%; height:${scale}%; top:${top}%; left:${left}%; background-size:100% 100%;`;
+            }
+            let url = String(pendantData);
+            let def = this.getDefaultPendantMetrics(url);
+            let top = -(def.scale - 100) / 2 + def.offsetY;
+            let left = -(def.scale - 100) / 2 + def.offsetX;
+            return `width:${def.scale}%; height:${def.scale}%; top:${top}%; left:${left}%; background-size:100% 100%;`;
         },
         // 新增：朋友圈长按删除逻辑
         momentPressTimer: null,
@@ -49009,15 +49066,16 @@ let specialClass = isSpecialType ? 'sticker' : '';
                     }
                 }
 
+                let pendantData = null;
                 let pendantUrl = '';
                 if (chat.settings && chat.settings.pendants) {
                     let pId = isUser ? 'User' : (char ? char.id : msg.charId);
                     if (chat.settings.pendants[pId]) {
-                        pendantUrl = chat.settings.pendants[pId];
+                        pendantData = chat.settings.pendants[pId];
+                        pendantUrl = typeof pendantData === 'object' ? (pendantData.url || '') : pendantData;
                     }
                 }
-                // 核心修复：在 url() 内部增加了单引号包裹 ${pendantUrl}
-                let pendantHtml = pendantUrl ? `<div style="position:absolute; ${WeChatSys.getPendantStyle(pendantUrl)} background-image:url('${pendantUrl}'); background-position:center; background-repeat:no-repeat; z-index:2; pointer-events:none;"></div>` : '';
+                let pendantHtml = pendantUrl ? `<div style="position:absolute; ${WeChatSys.getPendantStyle(pendantData)} background-image:url('${pendantUrl}'); background-position:center; background-repeat:no-repeat; z-index:2; pointer-events:none;"></div>` : '';
 
                 // 新增：提取角色 ID 传递给心声弹窗，支撑群聊功能
                 let heartCharId = isUser ? 'User' : (char ? char.id : msg.charId);
@@ -53316,6 +53374,9 @@ sysPrompt += `
 
         tempPendantTargetId: null,
         tempPendantUrl: '',
+        tempPendantScale: 135,
+        tempPendantOffsetX: 0,
+        tempPendantOffsetY: 0,
         isPendantDelMode: false,
         pendantDelSelected: [],
 
@@ -53327,8 +53388,9 @@ sysPrompt += `
                 this.tempPendantUrl = overrideUrl;
             } else {
                 let currentPendant = '';
-                if(chat.settings && chat.settings.pendants && chat.settings.pendants[this.tempPendantTargetId]) {
-                    currentPendant = chat.settings.pendants[this.tempPendantTargetId];
+                if (chat.settings && chat.settings.pendants && chat.settings.pendants[this.tempPendantTargetId]) {
+                    let saved = chat.settings.pendants[this.tempPendantTargetId];
+                    currentPendant = typeof saved === 'object' ? (saved.url || '') : saved;
                 }
                 this.tempPendantUrl = currentPendant;
             }
@@ -53345,13 +53407,12 @@ sysPrompt += `
             // 同步顶部按钮与底部控制栏状态
             document.getElementById('wx-pendant-del-icon').style.color = this.isPendantDelMode ? '#b3b3b3' : '#ff3b30';
             document.getElementById('wx-pendant-upload-icon').style.display = this.isPendantDelMode ? 'none' : 'flex';
-            document.getElementById('wx-pendant-normal-bar').style.display = this.isPendantDelMode ? 'none' : 'flex';
             document.getElementById('wx-pendant-del-bar').style.display = this.isPendantDelMode ? 'flex' : 'none';
 
             const grid = document.getElementById('wx-pendant-grid');
             let html = '';
 
-            // 1. 无挂件选项 (如果在删除模式下，隐藏或变灰这个选项)
+            // 1. 无挂件选项 (在非删除模式下显示，点击直接清除挂件)
             if (!this.isPendantDelMode) {
                 let borderStyle = this.tempPendantUrl === '' ? '2px solid #07c160' : '1px solid #efefef';
                 html += `<div onclick="WeChatSys.selectPendant('')" style="position:relative; width:100%; height:110px; background:#fff; border-radius:12px; border:${borderStyle}; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; overflow:hidden; box-sizing:border-box; transition: border 0.2s;">
@@ -53360,7 +53421,7 @@ sysPrompt += `
                 </div>`;
             }
             
-           // 完整预设挂件 (包含GIF、PNG与旧图)
+            // 完整预设挂件 (包含GIF、PNG与旧图)
             const defaultPendants = [
                 "https://i.postimg.cc/cChwJNCx/166.gif?dim=250x268",
                 "https://i.postimg.cc/KjfBYyjv/173.gif?dim=250x268",
@@ -53443,7 +53504,6 @@ sysPrompt += `
             if (!appData.settings.wxPendants) {
                 appData.settings.wxPendants = [...defaultPendants];
             } else {
-                // 自我更新逻辑：提取用户自己上传的图片，然后将这批全新的库覆盖进去，保证刷新页面后就是最新排序
                 let missing = defaultPendants.filter(url => !appData.settings.wxPendants.includes(url));
                 if (missing.length > 0) {
                      let customUploads = appData.settings.wxPendants.filter(url => !defaultPendants.includes(url));
@@ -53452,22 +53512,16 @@ sysPrompt += `
                 }
             }
 
-            if (!appData.settings.wxPendants) {
-                appData.settings.wxPendants = [...defaultPendants];
-            } else {
-                // 自我修复与更新逻辑：提取出用户自己上传的额外挂件，然后将完整的最新预设库覆盖进去，保证新添加的挂件永远按最新顺序排列！
-                let missing = defaultPendants.filter(url => !appData.settings.wxPendants.includes(url));
-                if (missing.length > 0) {
-                     let customUploads = appData.settings.wxPendants.filter(url => !defaultPendants.includes(url));
-                     appData.settings.wxPendants = [...customUploads, ...defaultPendants];
-                     saveGlobalData(); 
-                }
-            }
+            // 获取当前目标已保存的挂件对象，如果在列表中匹配则按已微调样式展示预览
+            let savedTargetPendant = (chat.settings && chat.settings.pendants) ? chat.settings.pendants[this.tempPendantTargetId] : null;
 
             // 2. 渲染其他挂件
             appData.settings.wxPendants.forEach((url, idx) => {
+                let previewData = url;
+                if (savedTargetPendant && typeof savedTargetPendant === 'object' && savedTargetPendant.url === url) {
+                    previewData = savedTargetPendant;
+                }
                 if (this.isPendantDelMode) {
-                    // 多选删除模式渲染
                     let isChecked = this.pendantDelSelected.includes(idx);
                     let cbHtml = isChecked 
                         ? `<div style="position:absolute; top:6px; right:6px; width:22px; height:22px; background:#ff3b30; border-radius:50%; display:flex; align-items:center; justify-content:center; border:1px solid #ff3b30; z-index:10;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg></div>` 
@@ -53478,14 +53532,14 @@ sysPrompt += `
                     html += `<div onclick="WeChatSys.togglePendantSelectForDelete(${idx})" style="position:relative; width:100%; height:110px; background:#fff; border-radius:12px; border:${borderStyle}; display:flex; align-items:center; justify-content:center; cursor:pointer; overflow:hidden; box-sizing:border-box; transition: all 0.2s;">
                         ${cbHtml}
                         <div style="position:relative; width:60px; height:60px; border-radius:50%; background-image:url('${avatarUrl}'); background-size:cover; background-position:center; opacity: ${isChecked ? '0.5' : '1'};">
-                            <div style="position:absolute; ${WeChatSys.getPendantStyle(url)} background-image:url('${url}'); background-position:center; background-repeat:no-repeat; pointer-events:none;"></div>
+                            <div style="position:absolute; ${WeChatSys.getPendantStyle(previewData)} background-image:url('${url}'); background-position:center; background-repeat:no-repeat; pointer-events:none;"></div>
                         </div>
                     </div>`;
                 } else {
                     let borderStyle = this.tempPendantUrl === url ? '2px solid #07c160' : '1px solid #efefef';
                     html += `<div onclick="WeChatSys.selectPendant('${url}')" style="position:relative; width:100%; height:110px; background:#fff; border-radius:12px; border:${borderStyle}; display:flex; align-items:center; justify-content:center; cursor:pointer; overflow:hidden; box-sizing:border-box; transition: border 0.2s;">
                         <div style="position:relative; width:60px; height:60px; border-radius:50%; background-image:url('${avatarUrl}'); background-size:cover; background-position:center;">
-                            <div style="position:absolute; ${WeChatSys.getPendantStyle(url)} background-image:url('${url}'); background-position:center; background-repeat:no-repeat; pointer-events:none;"></div>
+                            <div style="position:absolute; ${WeChatSys.getPendantStyle(previewData)} background-image:url('${url}'); background-position:center; background-repeat:no-repeat; pointer-events:none;"></div>
                         </div>
                     </div>`;
                 }
@@ -53497,7 +53551,90 @@ sysPrompt += `
 
         selectPendant: function(url) {
             if (this.isPendantDelMode) return;
-            this.openPendantSelector(null, url);
+            const chat = appData.chats.find(c => c.id === this.currentChatId);
+            if (!url) {
+                // 选择“无挂件”时直接清空保存并刷新选中框
+                if (!chat.settings.pendants) chat.settings.pendants = {};
+                chat.settings.pendants[this.tempPendantTargetId] = '';
+                this.tempPendantUrl = '';
+                saveGlobalData();
+                this.openPendantSelector(null, '');
+                this.renderMessages(true, 'all');
+                this.showToast('已取消挂件');
+                return;
+            }
+            this.openPendantAdjustModal(url);
+        },
+
+        openPendantAdjustModal: function(url) {
+            this.tempPendantUrl = url;
+            const chat = appData.chats.find(c => c.id === this.currentChatId);
+            let avatarUrl = '';
+            if (this.tempPendantTargetId === 'User') {
+                let linkedUserId = (chat.settings && chat.settings.linkedUser) ? chat.settings.linkedUser : 'default';
+                avatarUrl = window.UserSys.getEffectiveUser(linkedUserId).avatar;
+            } else {
+                let c = appData.charCards.find(x => x.id === this.tempPendantTargetId);
+                avatarUrl = c ? c.avatar : '';
+            }
+
+            let saved = (chat.settings && chat.settings.pendants) ? chat.settings.pendants[this.tempPendantTargetId] : null;
+            let metrics = this.getDefaultPendantMetrics(url);
+            if (saved && typeof saved === 'object' && saved.url === url) {
+                metrics = {
+                    scale: saved.scale !== undefined ? saved.scale : metrics.scale,
+                    offsetX: saved.offsetX !== undefined ? saved.offsetX : metrics.offsetX,
+                    offsetY: saved.offsetY !== undefined ? saved.offsetY : metrics.offsetY
+                };
+            }
+
+            this.tempPendantScale = metrics.scale;
+            this.tempPendantOffsetX = metrics.offsetX;
+            this.tempPendantOffsetY = metrics.offsetY;
+
+            document.getElementById('wx-pendant-adj-avatar').style.backgroundImage = `url('${avatarUrl}')`;
+            const layer = document.getElementById('wx-pendant-adj-layer');
+            layer.style.backgroundImage = `url('${url}')`;
+
+            document.getElementById('wx-pendant-adj-scale').value = this.tempPendantScale;
+            document.getElementById('wx-pendant-adj-x').value = this.tempPendantOffsetX;
+            document.getElementById('wx-pendant-adj-y').value = this.tempPendantOffsetY;
+
+            this.updatePendantAdjustPreview();
+            document.getElementById('modal-wx-pendant-adjust').style.display = 'flex';
+        },
+
+        onPendantAdjustInput: function() {
+            this.tempPendantScale = parseInt(document.getElementById('wx-pendant-adj-scale').value) || 135;
+            this.tempPendantOffsetX = parseInt(document.getElementById('wx-pendant-adj-x').value) || 0;
+            this.tempPendantOffsetY = parseInt(document.getElementById('wx-pendant-adj-y').value) || 0;
+            this.updatePendantAdjustPreview();
+        },
+
+        updatePendantAdjustPreview: function() {
+            document.getElementById('wx-pendant-adj-scale-val').innerText = `${this.tempPendantScale}%`;
+            document.getElementById('wx-pendant-adj-x-val').innerText = `${this.tempPendantOffsetX > 0 ? '+' : ''}${this.tempPendantOffsetX}%`;
+            document.getElementById('wx-pendant-adj-y-val').innerText = `${this.tempPendantOffsetY > 0 ? '+' : ''}${this.tempPendantOffsetY}%`;
+
+            const layer = document.getElementById('wx-pendant-adj-layer');
+            const styleStr = this.getPendantStyle({
+                url: this.tempPendantUrl,
+                scale: this.tempPendantScale,
+                offsetX: this.tempPendantOffsetX,
+                offsetY: this.tempPendantOffsetY
+            });
+            layer.style.cssText = `position:absolute; ${styleStr} background-image:url('${this.tempPendantUrl}'); background-position:center; background-repeat:no-repeat; pointer-events:none; z-index:2;`;
+        },
+
+        resetPendantAdjust: function() {
+            let def = this.getDefaultPendantMetrics(this.tempPendantUrl);
+            this.tempPendantScale = def.scale;
+            this.tempPendantOffsetX = def.offsetX;
+            this.tempPendantOffsetY = def.offsetY;
+            document.getElementById('wx-pendant-adj-scale').value = this.tempPendantScale;
+            document.getElementById('wx-pendant-adj-x').value = this.tempPendantOffsetX;
+            document.getElementById('wx-pendant-adj-y').value = this.tempPendantOffsetY;
+            this.updatePendantAdjustPreview();
         },
         
         togglePendantDeleteMode: function() {
@@ -53507,7 +53644,6 @@ sysPrompt += `
         },
         
         togglePendantSelectForDelete: function(idx) {
-            // 核心修复：现在用序号(idx)来标记选中，彻底解决同名链接连坐问题
             if (this.pendantDelSelected.includes(idx)) {
                 this.pendantDelSelected = this.pendantDelSelected.filter(item => item !== idx);
             } else {
@@ -53522,21 +53658,16 @@ sysPrompt += `
                 return;
             }
             
-            // 获取即将被删除的挂件对应的 URL
             let urlsToDelete = this.pendantDelSelected.map(idx => appData.settings.wxPendants[idx]);
-            
-            // 核心修复：清理数组数据，只筛掉被选中的那些序号
             appData.settings.wxPendants = appData.settings.wxPendants.filter((url, idx) => !this.pendantDelSelected.includes(idx));
-            
-            // 获取删除后，依然还存活的挂件 URL（用来处理同名链接的保护逻辑）
             let remainingUrls = appData.settings.wxPendants;
             
-            // 清理各个聊天中被废弃的绑定
             appData.chats.forEach(c => {
                 if (c.settings && c.settings.pendants) {
                     for (let key in c.settings.pendants) {
-                        // 核心修复：只有当这个被绑定的 URL 彻底从全局挂件库里绝迹了，才会把它从绑定里清空
-                        if (!remainingUrls.includes(c.settings.pendants[key]) && urlsToDelete.includes(c.settings.pendants[key])) {
+                        let pVal = c.settings.pendants[key];
+                        let pUrl = typeof pVal === 'object' ? (pVal.url || '') : pVal;
+                        if (!remainingUrls.includes(pUrl) && urlsToDelete.includes(pUrl)) {
                             c.settings.pendants[key] = ''; 
                         }
                     }
@@ -53547,7 +53678,6 @@ sysPrompt += `
             this.isPendantDelMode = false;
             this.pendantDelSelected = [];
             
-            // 如果刚才预览的刚好被删了，强制归零
             if (!appData.settings.wxPendants.includes(this.tempPendantUrl)) {
                 this.tempPendantUrl = '';
             }
@@ -53558,13 +53688,23 @@ sysPrompt += `
 
         savePendant: function() {
             const chat = appData.chats.find(c => c.id === this.currentChatId);
-            if(!chat.settings.pendants) chat.settings.pendants = {};
-            chat.settings.pendants[this.tempPendantTargetId] = this.tempPendantUrl;
+            if (!chat.settings.pendants) chat.settings.pendants = {};
+            if (!this.tempPendantUrl) {
+                chat.settings.pendants[this.tempPendantTargetId] = '';
+            } else {
+                chat.settings.pendants[this.tempPendantTargetId] = {
+                    url: this.tempPendantUrl,
+                    scale: this.tempPendantScale,
+                    offsetX: this.tempPendantOffsetX,
+                    offsetY: this.tempPendantOffsetY
+                };
+            }
             
             saveGlobalData();
-            document.getElementById('modal-wx-pendant-select').style.display = 'none';
-            // 实时更新当前视图的聊天气泡显示
+            document.getElementById('modal-wx-pendant-adjust').style.display = 'none';
+            this.openPendantSelector(null, this.tempPendantUrl);
             this.renderMessages(true, 'all');
+            this.showToast('挂件设置已保存');
         },
 
         openPendantUpload: function() {
@@ -53579,19 +53719,19 @@ sysPrompt += `
             const width = document.getElementById('wx-pendant-width').value.trim();
             const height = document.getElementById('wx-pendant-height').value.trim();
             
-            if(url) {
+            if (url) {
                 let finalUrl = url;
-                // 如果用户手动填写了宽高，且链接里没有参数，则自动注入用于动态自适应！
                 if (width && height && !url.includes('dim=')) {
                     finalUrl += (url.includes('?') ? '&' : '?') + `dim=${width}x${height}`;
                 }
                 
-                if(!appData.settings.wxPendants) appData.settings.wxPendants = [];
+                if (!appData.settings.wxPendants) appData.settings.wxPendants = [];
                 appData.settings.wxPendants.unshift(finalUrl);
                 saveGlobalData();
                 document.getElementById('modal-wx-pendant-upload').style.display = 'none';
                 
-                this.openPendantSelector(null, finalUrl);
+                this.openPendantSelector(null, this.tempPendantUrl);
+                this.openPendantAdjustModal(finalUrl);
             } else {
                 this.showToast('请输入图片直链');
             }
