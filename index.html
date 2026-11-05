@@ -6,7 +6,7 @@
     <meta name="color-scheme" content="light">
     
     <!-- ================= PWA 核心配置开始 ================= -->
-    <link rel="manifest" href="./manifest.json?v=2">
+    <link rel="manifest" href="./manifest.json">
     <meta name="theme-color" id="global-theme-color" content="#fafafa">
     <!-- iOS Safari 专属配置 -->
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -55105,7 +55105,7 @@ generateVoice: async function(text, voiceId, speed = 1.0) {
 <script>
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', function() {
-            navigator.serviceWorker.register('./sw.js?v=2').then(function(registration) {
+            navigator.serviceWorker.register('./sw.js').then(function(registration) {
                 console.log('PWA 注册成功');
             }).catch(function(err) {
                 console.log('PWA 注册失败: ', err);
