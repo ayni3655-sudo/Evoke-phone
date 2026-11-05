@@ -17596,6 +17596,20 @@ ${historyLines}
                     </div>
 
                     <div style="background:#fff; border-radius:16px; padding:14px;">
+                        <div style="font-size:13.5px; font-weight:800; color:#111; margin-bottom:6px;">外卖配送地图模式</div>
+                        <div style="display:flex; gap:10px; margin-bottom:10px;">
+                            <div id="wm-set-map-virtual" onclick="window.WaimaiApp.setMapMode('virtual')" style="flex:1; text-align:center; padding:8px; border-radius:10px; font-size:12px; font-weight:700; cursor:pointer; background:#111; color:#ffd100;">绘制虚拟地图</div>
+                            <div id="wm-set-map-real" onclick="window.WaimaiApp.setMapMode('real')" style="flex:1; text-align:center; padding:8px; border-radius:10px; font-size:12px; font-weight:700; cursor:pointer; background:#f2f2f5; color:#555;">实景交互地图</div>
+                        </div>
+                        <div id="wm-set-map-virtual-tip" style="font-size:11.5px; color:#8e8e93; line-height:1.5;">
+                            虚拟地图模式：采用内置矢量绘制地图，生成虚拟千米数与固定路线，轻量极速。
+                        </div>
+                        <div id="wm-set-map-real-tip" style="display:none; font-size:11.5px; color:#ff6b00; line-height:1.5;">
+                            实景地图模式：加载真实城市街道图层（含多源备用底图），支持手指拖拽与放大缩小；生成店铺时自带真实街道地址、真实经纬度与实际测算千米数，骑手沿真实马路导航配送。
+                        </div>
+                    </div>
+
+                    <div style="background:#fff; border-radius:16px; padding:14px;">
                         <div style="font-size:13.5px; font-weight:800; color:#111; margin-bottom:6px;">刷新与搜索生成店铺数量</div>
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
                             <span style="font-size:12px; color:#555;">每次生成店铺数量范围 (家)</span>
@@ -17841,6 +17855,185 @@ ${historyLines}
                     }
                 ],
 
+                _leafletLoaded: false,
+                _leafletLoadingPromise: null,
+                _mapInstances: {},
+                _tileSourceIdx: 0,
+
+                // 3大免Key国内高速真实街道瓦片源（标准街景 + 极速街景 + 清爽街景，全中文无水印且坐标100%对齐）
+                tileSources: [
+                    { name: '标准街景', url: 'https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', subdomains: ['1','2','3','4'] },
+                    { name: '极速街景', url: 'https://wprd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&style=7&x={x}&y={y}&z={z}', subdomains: ['1','2','3','4'] },
+                    { name: '清爽街景', url: 'https://wprd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scl=2&style=7&x={x}&y={y}&z={z}', subdomains: ['1','2','3','4'] }
+                ],
+
+                // 纯代码绘制“萌兔长耳明黄头盔 + 护目镜 + 小电驴”专送骑手SVG徽标
+                getBunnyRiderSvg: function(size = 34) {
+                    return `<svg viewBox="0 0 44 44" width="${size}" height="${size}" style="display:block; overflow:visible; filter:drop-shadow(0 3px 6px rgba(0,0,0,0.22));">
+                        <!-- 底部定位脉冲光圈 -->
+                        <circle cx="22" cy="25" r="18" fill="rgba(255, 209, 0, 0.28)"/>
+                        <circle cx="22" cy="25" r="13.5" fill="#ffffff" stroke="#111111" stroke-width="1.8"/>
+                        <!-- 左兔耳（微向外翘） -->
+                        <g transform="rotate(-14 15 11)">
+                            <rect x="11.5" y="1.5" width="6.5" height="14.5" rx="3.25" fill="#ffd100" stroke="#111111" stroke-width="1.6"/>
+                            <rect x="13.3" y="4" width="2.9" height="8.5" rx="1.45" fill="#ff85a2"/>
+                        </g>
+                        <!-- 右兔耳（微向外翘） -->
+                        <g transform="rotate(14 29 11)">
+                            <rect x="26" y="1.5" width="6.5" height="14.5" rx="3.25" fill="#ffd100" stroke="#111111" stroke-width="1.6"/>
+                            <rect x="27.8" y="4" width="2.9" height="8.5" rx="1.45" fill="#ff85a2"/>
+                        </g>
+                        <!-- 明黄色骑手头盔主体 -->
+                        <path d="M 10.5 23 C 10.5 14.2 33.5 14.2 33.5 23 C 33.5 27.5 30.5 30.5 22 30.5 C 13.5 30.5 10.5 27.5 10.5 23 Z" fill="#ffd100" stroke="#111111" stroke-width="1.7" stroke-linejoin="round"/>
+                        <!-- 头盔顶部竹蜻蜓小风叶装饰 -->
+                        <line x1="22" y1="13" x2="22" y2="15.5" stroke="#111111" stroke-width="1.6" stroke-linecap="round"/>
+                        <ellipse cx="22" cy="12.5" rx="4.5" ry="1.3" fill="#ff6b00" stroke="#111111" stroke-width="1.2"/>
+                        <!-- 酷炫深色防风护目镜面罩 -->
+                        <rect x="13" y="19.2" width="18" height="7.5" rx="3.75" fill="#1e2229" stroke="#111111" stroke-width="1.4"/>
+                        <!-- 护目镜高光反光条与萌兔发光眼神 -->
+                        <path d="M 15.5 21.5 L 19.5 21.5" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round" opacity="0.9"/>
+                        <circle cx="26.5" cy="23" r="1.4" fill="#ffd100"/>
+                        <!-- 下方小电驴车把与圆形车大灯 -->
+                        <path d="M 14 32.5 L 30 32.5" stroke="#111111" stroke-width="2.4" stroke-linecap="round"/>
+                        <path d="M 16 32.5 L 18 37.5 L 26 37.5 L 28 32.5 Z" fill="#ff6b00" stroke="#111111" stroke-width="1.5" stroke-linejoin="round"/>
+                        <circle cx="22" cy="34.5" r="2.3" fill="#ffffff" stroke="#111111" stroke-width="1.3"/>
+                    </svg>`;
+                },
+
+                // 城市基准经纬度词典（用于解析用户地址及兜底）
+                cityCoordsDict: {
+                    '上海': [31.2304, 121.4737], '北京': [39.9042, 116.4074], '广州': [23.1291, 113.2644],
+                    '深圳': [22.5431, 114.0579], '杭州': [30.2741, 120.1551], '成都': [30.5728, 104.0668],
+                    '重庆': [29.5630, 106.5516], '武汉': [30.5928, 114.3055], '南京': [32.0603, 118.7969],
+                    '西安': [34.3416, 108.9398], '苏州': [31.2989, 120.5853], '长沙': [28.2282, 112.9388],
+                    '青岛': [36.0671, 120.3826], '厦门': [24.4798, 118.0894], '天津': [39.3434, 117.3616]
+                },
+
+                isRealMapMode: function() {
+                    return !!(appData.waimai && appData.waimai.settings && appData.waimai.settings.mapMode === 'real');
+                },
+
+                // 根据文本地址智能推算基准经纬度 [lat, lng]
+                resolveAddressCoords: function(addrText) {
+                    const str = String(addrText || '');
+                    for (let city in this.cityCoordsDict) {
+                        if (str.includes(city)) {
+                            const base = this.cityCoordsDict[city];
+                            let hash = 0;
+                            for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+                            const dLat = ((hash % 100) / 10000) * (hash % 2 === 0 ? 1 : -1);
+                            const dLng = (((hash >> 3) % 100) / 10000) * (hash % 3 === 0 ? 1 : -1);
+                            return [parseFloat((base[0] + dLat).toFixed(5)), parseFloat((base[1] + dLng).toFixed(5))];
+                        }
+                    }
+                    // 默认使用上海市中心静安寺/南京西路商圈真实坐标作为基准
+                    let hash = 0;
+                    for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+                    const dLat = ((Math.abs(hash) % 80) - 40) / 10000;
+                    const dLng = ((Math.abs(hash >> 4) % 80) - 40) / 10000;
+                    return [parseFloat((31.2278 + dLat).toFixed(5)), parseFloat((121.4586 + dLng).toFixed(5))];
+                },
+
+                // Haversine 公式计算两点真实道路估算距离 (km)
+                calcRealDistanceKm: function(lat1, lng1, lat2, lng2) {
+                    const R = 6371;
+                    const dLat = (lat2 - lat1) * Math.PI / 180;
+                    const dLng = (lng2 - lng1) * Math.PI / 180;
+                    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                              Math.sin(dLng / 2) * Math.sin(dLng / 2);
+                    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                    // 乘以 1.28 折算城市道路拐弯系数
+                    const roadKm = Math.max(0.3, R * c * 1.28);
+                    return roadKm.toFixed(1) + 'km';
+                },
+
+                // 动态加载开源 Leaflet 引擎（含主备双 CDN 容灾）
+                ensureLeafletLoaded: function() {
+                    if (window.L && this._leafletLoaded) return Promise.resolve(true);
+                    if (this._leafletLoadingPromise) return this._leafletLoadingPromise;
+
+                    this._leafletLoadingPromise = new Promise((resolve) => {
+                        if (!document.getElementById('wm-leaflet-css')) {
+                            const link = document.createElement('link');
+                            link.id = 'wm-leaflet-css';
+                            link.rel = 'stylesheet';
+                            link.href = 'https://cdn.staticfile.net/leaflet/1.9.4/leaflet.min.css';
+                            link.onerror = () => {
+                                link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+                            };
+                            document.head.appendChild(link);
+                        }
+
+                        if (!document.getElementById('wm-leaflet-custom-style')) {
+                            const st = document.createElement('style');
+                            st.id = 'wm-leaflet-custom-style';
+                            st.innerHTML = `
+                                .wm-real-map-box .leaflet-control-attribution { display: none !important; }
+                                .wm-real-map-box .leaflet-div-icon { background: transparent !important; border: none !important; }
+                            `;
+                            document.head.appendChild(st);
+                        }
+
+                        const script = document.createElement('script');
+                        script.src = 'https://cdn.staticfile.net/leaflet/1.9.4/leaflet.min.js';
+                        script.onload = () => {
+                            this._leafletLoaded = true;
+                            resolve(true);
+                        };
+                        script.onerror = () => {
+                            const backupScript = document.createElement('script');
+                            backupScript.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+                            backupScript.onload = () => {
+                                this._leafletLoaded = true;
+                                resolve(true);
+                            };
+                            backupScript.onerror = () => {
+                                this._leafletLoadingPromise = null;
+                                resolve(false);
+                            };
+                            document.head.appendChild(backupScript);
+                        };
+                        document.head.appendChild(script);
+                    });
+                    return this._leafletLoadingPromise;
+                },
+
+                // 获取两点之间的真实马路拐弯路径点（优先调开源 OSRM 真实道路路由，失败用拟真城市街区折线兜底）
+                fetchRealRoadRoute: async function(startLatLng, endLatLng) {
+                    const sLat = startLatLng[0], sLng = startLatLng[1];
+                    const eLat = endLatLng[0], eLng = endLatLng[1];
+                    try {
+                        const url = `https://router.project-osrm.org/route/v1/driving/${sLng},${sLat};${eLng},${eLat}?overview=full&geometries=geojson`;
+                        const controller = new AbortController();
+                        const timer = setTimeout(() => controller.abort(), 3200);
+                        const res = await fetch(url, { signal: controller.signal });
+                        clearTimeout(timer);
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data.routes && data.routes[0] && data.routes[0].geometry && data.routes[0].geometry.coordinates) {
+                                const coords = data.routes[0].geometry.coordinates.map(pt => [pt[1], pt[0]]);
+                                if (coords.length >= 2) return coords;
+                            }
+                        }
+                    } catch (e) {}
+
+                    // 拟真城市十字街区折线兜底（确保包含多个平滑道路节点供骑手移动）
+                    const midLat1 = sLat + (eLat - sLat) * 0.35;
+                    const midLng1 = sLng + (eLng - sLng) * 0.15;
+                    const midLat2 = sLat + (eLat - sLat) * 0.45;
+                    const midLng2 = sLng + (eLng - sLng) * 0.65;
+                    const midLat3 = sLat + (eLat - sLat) * 0.82;
+                    const midLng3 = sLng + (eLng - sLng) * 0.88;
+                    return [
+                        [sLat, sLng],
+                        [midLat1, midLng1],
+                        [midLat2, midLng2],
+                        [midLat3, midLng3],
+                        [eLat, eLng]
+                    ];
+                },
+
                 initData: function() {
                     if (!appData.waimai) {
                         appData.waimai = {
@@ -17849,6 +18042,7 @@ ${historyLines}
                                 apiEngine: 'api',
                                 deliveryMode: 'realistic',
                                 customStepSecs: 15,
+                                mapMode: 'virtual',
                                 storeGenMin: 5,
                                 storeGenMax: 8
                             },
@@ -17858,7 +18052,8 @@ ${historyLines}
                         };
                     }
                     const wm = appData.waimai;
-                    if (!wm.settings) wm.settings = { apiEngine: 'api', deliveryMode: 'realistic', customStepSecs: 15, storeGenMin: 5, storeGenMax: 8 };
+                    if (!wm.settings) wm.settings = { apiEngine: 'api', deliveryMode: 'realistic', customStepSecs: 15, mapMode: 'virtual', storeGenMin: 5, storeGenMax: 8 };
+                    if (!wm.settings.mapMode) wm.settings.mapMode = 'virtual';
                     if (wm.settings.storeGenMin === undefined) wm.settings.storeGenMin = 5;
                     if (wm.settings.storeGenMax === undefined) wm.settings.storeGenMax = 8;
                     if (!wm.userProfiles) wm.userProfiles = {};
@@ -18072,9 +18267,23 @@ ${historyLines}
                         ];
                     }
 
+                    // 生成店铺默认真实坐标与街道地址（围绕中心城区周边 0.8~2.2km 分布）
+                    let hash = 0;
+                    const sName = String(cfg.name || '美食店');
+                    for (let i = 0; i < sName.length; i++) hash = sName.charCodeAt(i) + ((hash << 5) - hash);
+                    const offsetLat = (((Math.abs(hash) % 160) - 80) / 10000) || 0.0085;
+                    const offsetLng = (((Math.abs(hash >> 4) % 160) - 80) / 10000) || 0.0102;
+                    const defaultLat = parseFloat((31.2278 + offsetLat).toFixed(5));
+                    const defaultLng = parseFloat((121.4586 + offsetLng).toFixed(5));
+                    const roadNames = ['南京西路', '淮海中路', '愚园路', '武康路', '静安寺路', '铜仁路', '胶州路', '陕西北路', '延安中路', '巨鹿路'];
+                    const defaultAddr = `${roadNames[Math.abs(hash) % roadNames.length]}${100 + (Math.abs(hash) % 800)}号1层`;
+
                     return {
                         id: cfg.id,
                         name: cfg.name,
+                        address: cfg.address || defaultAddr,
+                        lat: cfg.lat || defaultLat,
+                        lng: cfg.lng || defaultLng,
                         cats: cfg.cats, // e.g. ['food', 'dessert']
                         score: cfg.score || 4.9,
                         monthlySales: cfg.monthlySales || 2800,
@@ -18536,10 +18745,10 @@ ${historyLines}
                     }).join('');
                 },
 
-                // ==================== 高德风实时配送动态 SVG 地图绘制引擎 ====================
+                // ==================== 虚拟SVG / 高德真实交互地图双模绘制引擎 ====================
                 buildAmapSvgHtml: function(order, heightPx = 190) {
                     const stg = order.stageIndex || 0;
-                    const hasRider = stg >= 2; // 只有阶段 >= 2 (骑手已接单) 才出现骑手图标
+                    const hasRider = stg >= 2;
                     let rx = 70, ry = 58, bubbleTxt = '商家正在备餐';
                     const totalKm = parseFloat(String(order.storeDistance || '1.5').replace(/[^\d.]/g, '')) || 1.5;
 
@@ -18565,6 +18774,30 @@ ${historyLines}
                         bubbleTxt = '外卖已送达 · 祝您用餐愉快';
                     }
 
+                    // 分支1：开启了「实景交互地图」模式
+                    if (this.isRealMapMode()) {
+                        const domId = `wm_realmap_${order.id}_${heightPx}`;
+                        setTimeout(() => {
+                            this.mountRealInteractiveMap(domId, order, bubbleTxt, hasRider);
+                        }, 60);
+
+                        const curSource = this.tileSources[this._tileSourceIdx % this.tileSources.length];
+                        return `
+                        <div class="wm-real-map-box" style="width:100%; height:${heightPx}px; border-radius:16px; overflow:hidden; position:relative; border:0.5px solid rgba(0,0,0,0.1); box-shadow:0 2px 10px rgba(0,0,0,0.04); touch-action:none;"
+                             ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();" onmousedown="event.stopPropagation();" onclick="event.stopPropagation();">
+                            <div id="${domId}" style="width:100%; height:100%; background:#eef2f6; z-index:1;"></div>
+                            <div style="position:absolute; top:8px; right:8px; z-index:400; display:flex;">
+                                <div onclick="event.stopPropagation(); window.WaimaiApp.switchMapTileSource('${domId}', '${order.id}', ${heightPx});" style="background:rgba(255,255,255,0.92); backdrop-filter:blur(6px); padding:4px 10px; border-radius:8px; font-size:10px; font-weight:800; color:#111; border:0.5px solid rgba(0,0,0,0.12); cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
+                                    切换图源 (${curSource.name})
+                                </div>
+                            </div>
+                            <div style="position:absolute; bottom:8px; left:10px; z-index:400; background:rgba(255,255,255,0.92); backdrop-filter:blur(4px); padding:3px 8px; border-radius:6px; font-size:10px; font-weight:700; color:#1677ff; border:0.5px solid rgba(22,119,255,0.2); pointer-events:none;">
+                                ${hasRider ? `实时导航 · 骑手${order.riderName || '王师傅'} (可拖拽缩放)` : `实时定位 · ${order.storeAddress || order.storeName}`}
+                            </div>
+                        </div>`;
+                    }
+
+                    // 分支2：保持原有「绘制虚拟地图」模式（同步升级为萌兔头盔骑手）
                     const storeShort = String(order.storeName || '商家').substring(0, 4);
                     return `
                     <div style="width:100%; height:${heightPx}px; border-radius:16px; overflow:hidden; position:relative; border:0.5px solid rgba(0,0,0,0.08); box-shadow:inset 0 0 10px rgba(0,0,0,0.03);">
@@ -18617,19 +18850,32 @@ ${historyLines}
                             </g>
 
                             ${hasRider ? `
-                            <!-- 动态移动的外卖骑手图标与悬浮气泡（仅在骑手已接单后展示） -->
+                            <!-- 动态移动的萌兔头盔外卖骑手图标与悬浮气泡 -->
                             <g transform="translate(${rx}, ${ry})" style="transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);">
-                                <g transform="translate(0, -28)">
+                                <g transform="translate(0, -32)">
                                     <rect x="-68" y="-14" width="136" height="22" rx="11" fill="#111111" opacity="0.92"/>
                                     <polygon points="-4,8 4,8 0,13" fill="#111111" opacity="0.92"/>
                                     <text x="0" y="0" text-anchor="middle" fill="#ffd100" font-size="9.5" font-weight="800">${bubbleTxt}</text>
                                 </g>
-                                <circle cx="0" cy="0" r="17" fill="rgba(255, 209, 0, 0.32)"/>
-                                <circle cx="0" cy="0" r="12" fill="#ffd100" stroke="#111111" stroke-width="2"/>
-                                <path d="M -5 -2 C -5 -6 5 -6 5 -2 L 6 3 L -6 3 Z" fill="#111111"/>
-                                <circle cx="-3.5" cy="-6" r="1.8" fill="#111111"/>
-                                <circle cx="3.5" cy="-6" r="1.8" fill="#111111"/>
-                                <rect x="-3.5" y="-2" width="7" height="2.8" rx="1" fill="#ffffff"/>
+                                <g transform="translate(-18, -20) scale(0.82)">
+                                    <circle cx="22" cy="25" r="18" fill="rgba(255, 209, 0, 0.28)"/>
+                                    <circle cx="22" cy="25" r="13.5" fill="#ffffff" stroke="#111111" stroke-width="1.8"/>
+                                    <g transform="rotate(-14 15 11)">
+                                        <rect x="11.5" y="1.5" width="6.5" height="14.5" rx="3.25" fill="#ffd100" stroke="#111111" stroke-width="1.6"/>
+                                        <rect x="13.3" y="4" width="2.9" height="8.5" rx="1.45" fill="#ff85a2"/>
+                                    </g>
+                                    <g transform="rotate(14 29 11)">
+                                        <rect x="26" y="1.5" width="6.5" height="14.5" rx="3.25" fill="#ffd100" stroke="#111111" stroke-width="1.6"/>
+                                        <rect x="27.8" y="4" width="2.9" height="8.5" rx="1.45" fill="#ff85a2"/>
+                                    </g>
+                                    <path d="M 10.5 23 C 10.5 14.2 33.5 14.2 33.5 23 C 33.5 27.5 30.5 30.5 22 30.5 C 13.5 30.5 10.5 27.5 10.5 23 Z" fill="#ffd100" stroke="#111111" stroke-width="1.7" stroke-linejoin="round"/>
+                                    <rect x="13" y="19.2" width="18" height="7.5" rx="3.75" fill="#1e2229" stroke="#111111" stroke-width="1.4"/>
+                                    <path d="M 15.5 21.5 L 19.5 21.5" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round"/>
+                                    <circle cx="26.5" cy="23" r="1.4" fill="#ffd100"/>
+                                    <path d="M 14 32.5 L 30 32.5" stroke="#111111" stroke-width="2.4" stroke-linecap="round"/>
+                                    <path d="M 16 32.5 L 18 37.5 L 26 37.5 L 28 32.5 Z" fill="#ff6b00" stroke="#111111" stroke-width="1.5"/>
+                                    <circle cx="22" cy="34.5" r="2.3" fill="#ffffff" stroke="#111111" stroke-width="1.3"/>
+                                </g>
                             </g>
                             ` : ''}
                         </svg>
@@ -18637,6 +18883,183 @@ ${historyLines}
                             ${hasRider ? `实时定位 · 骑手${order.riderName || '王师傅'}` : `实时定位 · 等待骑手接单`}
                         </div>
                     </div>`;
+                },
+
+                // 挂载并渲染真实的 Leaflet + 高德瓦片可交互地图与真实道路轨迹
+                mountRealInteractiveMap: async function(domId, order, bubbleTxt, hasRider) {
+                    const el = document.getElementById(domId);
+                    if (!el) return;
+                    const loaded = await this.ensureLeafletLoaded();
+                    if (!loaded || !window.L) {
+                        el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:12px;color:#8e8e93;">真实地图引擎加载失败，请检查网络连接</div>`;
+                        return;
+                    }
+
+                    // 清理旧实例防止重复挂载报错
+                    if (this._mapInstances[domId]) {
+                        try { this._mapInstances[domId].remove(); } catch(e) {}
+                        delete this._mapInstances[domId];
+                    }
+
+                    // 确定终点（买家收货坐标）与起点（店铺坐标）
+                    if (!order.buyerCoords || !Array.isArray(order.buyerCoords)) {
+                        order.buyerCoords = this.resolveAddressCoords(order.address ? order.address.detail : '上海市静安区南京西路1266号');
+                    }
+                    if (!order.storeCoords || !Array.isArray(order.storeCoords)) {
+                        const stObj = this.findStoreById(order.storeId);
+                        if (stObj && stObj.lat && stObj.lng) {
+                            order.storeCoords = [stObj.lat, stObj.lng];
+                            if (!order.storeAddress) order.storeAddress = stObj.address;
+                        } else {
+                            order.storeCoords = [
+                                parseFloat((order.buyerCoords[0] + 0.0095).toFixed(5)),
+                                parseFloat((order.buyerCoords[1] - 0.0115).toFixed(5))
+                            ];
+                        }
+                    }
+
+                    // 获取或规划真实道路拐弯路径点
+                    if (!Array.isArray(order.routeCoords) || order.routeCoords.length < 2) {
+                        order.routeCoords = await this.fetchRealRoadRoute(order.storeCoords, order.buyerCoords);
+                        this.save();
+                    }
+
+                    const containerEl = document.getElementById(domId);
+                    if (!containerEl) return;
+
+                    const map = L.map(containerEl, {
+                        zoomControl: true,
+                        attributionControl: false,
+                        dragging: true,
+                        touchZoom: true,
+                        scrollWheelZoom: true
+                    });
+                    this._mapInstances[domId] = map;
+
+                    const src = this.tileSources[this._tileSourceIdx % this.tileSources.length];
+                    const tileLayer = L.tileLayer(src.url, {
+                        subdomains: src.subdomains,
+                        maxZoom: 19,
+                        minZoom: 3
+                    }).addTo(map);
+
+                    // 若当前瓦片源加载报错，自动无缝切换至备用瓦片源
+                    let errorCount = 0;
+                    tileLayer.on('tileerror', () => {
+                        errorCount++;
+                        if (errorCount === 4) {
+                            this._tileSourceIdx = (this._tileSourceIdx + 1) % this.tileSources.length;
+                            const nextSrc = this.tileSources[this._tileSourceIdx];
+                            tileLayer.setUrl(nextSrc.url);
+                        }
+                    });
+
+                    // 绘制清晰锐利的蓝色虚线导航路线（纯白实心衬底防模糊 + 平头锐利虚线 + 缩放自动平滑折点）
+                    const routeLineBg = L.polyline(order.routeCoords, { color: '#ffffff', weight: 4.5, opacity: 0.95, lineCap: 'round', lineJoin: 'round', smoothFactor: 1.5 }).addTo(map);
+                    const routeLine = L.polyline(order.routeCoords, { color: '#1677ff', weight: 2.5, opacity: 1, dashArray: '5, 5', lineCap: 'butt', lineJoin: 'round', smoothFactor: 1.5 }).addTo(map);
+
+                    const storeShort = String(order.storeName || '商家').substring(0, 5);
+                    const storeBubbleHtml = !hasRider ? `
+                        <div style="position:absolute; bottom:38px; left:50%; transform:translateX(-50%); background:#111; color:#ffd100; font-size:10px; font-weight:800; padding:3px 9px; border-radius:10px; white-space:nowrap; box-shadow:0 3px 8px rgba(0,0,0,0.2);">
+                            ${bubbleTxt}
+                        </div>` : '';
+
+                    // 1. 起点商家 Marker
+                    const storeIcon = L.divIcon({
+                        className: 'wm-leaflet-div-icon',
+                        html: `
+                        <div style="position:relative; width:64px; height:42px; display:flex; flex-direction:column; align-items:center;">
+                            ${storeBubbleHtml}
+                            <div style="width:24px; height:24px; border-radius:12px; background:#111111; border:2px solid #ffffff; color:#ffd100; font-size:10px; font-weight:900; display:flex; align-items:center; justify-content:center; box-shadow:0 3px 8px rgba(0,0,0,0.25);">商</div>
+                            <div style="background:rgba(255,255,255,0.94); border:0.5px solid #ccc; border-radius:4px; padding:0 4px; font-size:9px; font-weight:700; color:#222; white-space:nowrap; margin-top:1px;">${storeShort}</div>
+                        </div>`,
+                        iconSize: [64, 42],
+                        iconAnchor: [32, 16]
+                    });
+                    L.marker(order.storeCoords, { icon: storeIcon }).addTo(map);
+
+                    // 2. 终点买家收货地 Marker
+                    const buyerShort = order.address && order.address.name ? `${order.address.name}` : '收货地';
+                    const buyerIcon = L.divIcon({
+                        className: 'wm-leaflet-div-icon',
+                        html: `
+                        <div style="position:relative; width:64px; height:42px; display:flex; flex-direction:column; align-items:center;">
+                            <div style="width:24px; height:24px; border-radius:12px; background:#07c160; border:2px solid #ffffff; color:#ffffff; font-size:10px; font-weight:900; display:flex; align-items:center; justify-content:center; box-shadow:0 3px 8px rgba(0,0,0,0.25);">家</div>
+                            <div style="background:rgba(255,255,255,0.94); border:0.5px solid #ccc; border-radius:4px; padding:0 4px; font-size:9px; font-weight:700; color:#111; white-space:nowrap; margin-top:1px;">${buyerShort}</div>
+                        </div>`,
+                        iconSize: [64, 42],
+                        iconAnchor: [32, 16]
+                    });
+                    L.marker(order.buyerCoords, { icon: buyerIcon }).addTo(map);
+
+                    // 3. 骑手沿真实道路轨迹移动 Marker
+                    if (hasRider) {
+                        const pts = order.routeCoords;
+                        const stg = order.stageIndex || 2;
+                        let riderCoord = order.storeCoords;
+
+                        if (stg === 2) {
+                            // 骑手接单赶往商家：位于商家附近约 250m 处
+                            riderCoord = [order.storeCoords[0] - 0.0022, order.storeCoords[1] - 0.0025];
+                        } else if (stg === 3) {
+                            // 骑手已到店
+                            riderCoord = pts[0];
+                        } else if (stg === 4) {
+                            // 配送中：取真实道路轨迹中段位置
+                            const midIdx = Math.floor(pts.length * 0.52);
+                            riderCoord = pts[midIdx] || pts[0];
+                            // 动态计算当前骑手距终点的真实剩余千米数
+                            const remKm = this.calcRealDistanceKm(riderCoord[0], riderCoord[1], order.buyerCoords[0], order.buyerCoords[1]);
+                            bubbleTxt = `骑手配送中 · 距您 ${remKm}`;
+                        } else if (stg === 5) {
+                            // 即将送达：取真实道路轨迹 88% 处
+                            const nearIdx = Math.max(0, Math.floor(pts.length * 0.88));
+                            riderCoord = pts[nearIdx] || order.buyerCoords;
+                        } else {
+                            riderCoord = order.buyerCoords;
+                        }
+
+                        const riderIcon = L.divIcon({
+                            className: 'wm-leaflet-div-icon',
+                            html: `
+                            <div style="position:relative; width:160px; height:64px; display:flex; flex-direction:column; align-items:center; pointer-events:none;">
+                                <div style="position:relative; background:#111111; color:#ffd100; font-size:10px; font-weight:800; padding:3.5px 10px; border-radius:11px; white-space:nowrap; box-shadow:0 4px 10px rgba(0,0,0,0.25); margin-bottom:2px;">
+                                    ${bubbleTxt}
+                                    <div style="position:absolute; bottom:-4px; left:50%; transform:translateX(-50%); width:0; height:0; border-left:4px solid transparent; border-right:4px solid transparent; border-top:5px solid #111111;"></div>
+                                </div>
+                                ${this.getBunnyRiderSvg(34)}
+                            </div>`,
+                            iconSize: [160, 64],
+                            iconAnchor: [80, 48]
+                        });
+                        L.marker(riderCoord, { icon: riderIcon, zIndexOffset: 1000 }).addTo(map);
+                    }
+
+                    // 自动缩放视野以完整展示商家、骑手与收货地
+                    const bounds = routeLine.getBounds().pad(0.28);
+                    map.fitBounds(bounds);
+                    map._savedFitBounds = bounds;
+                    setTimeout(() => { map.invalidateSize(); map.fitBounds(bounds); }, 180);
+                },
+
+                switchMapTileSource: function(domId, orderId, heightPx) {
+                    this._tileSourceIdx = (this._tileSourceIdx + 1) % this.tileSources.length;
+                    const found = this.findOrderGlobal(orderId);
+                    if (found && found.order) {
+                        const stg = found.order.stageIndex || 0;
+                        this.mountRealInteractiveMap(domId, found.order, '路线已更新', stg >= 2);
+                        if (this.currentTab === 'home') this.renderHomeLiveOrderBanner();
+                        if (this.activeOrderId === orderId && document.getElementById('wm-subpage-order-track').classList.contains('show')) {
+                            this.openOrderTrackPage(orderId);
+                        }
+                    }
+                },
+
+                recenterRealMap: function(domId) {
+                    const map = this._mapInstances[domId];
+                    if (map && map._savedFitBounds) {
+                        map.fitBounds(map._savedFitBounds, { animate: true });
+                    }
                 },
 
                 // 在首页金刚区与商家列表中间渲染“正在配送中”的实时地图小卡片
@@ -18700,6 +19123,7 @@ ${historyLines}
                             <div style="font-size:11.5px; color:#555; margin-top:4px;">
                                 <span style="color:#ff6b00; font-weight:800;">★ ${st.score}</span> · 月售${st.monthlySales}+ · 约${st.deliveryMins}分钟 · 距离${st.distance}
                             </div>
+                            ${st.address ? `<div style="font-size:11px; color:#666; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">📍 商家地址：${st.address}</div>` : ''}
                             <div class="wm-notice-bar">
                                 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#8e8e93" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; display:block;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>
                                 <div class="wm-notice-marquee-wrap">
@@ -19407,6 +19831,10 @@ ${historyLines}
                     }
                     this.cart[sum.store.id] = [];
 
+                    const buyerCoords = curAddr.lat && curAddr.lng ? [curAddr.lat, curAddr.lng] : this.resolveAddressCoords(curAddr.detail);
+                    const storeCoords = (sum.store.lat && sum.store.lng) ? [sum.store.lat, sum.store.lng] : [parseFloat((buyerCoords[0] + 0.009).toFixed(5)), parseFloat((buyerCoords[1] - 0.011).toFixed(5))];
+                    const realComputedDist = this.isRealMapMode() ? this.calcRealDistanceKm(storeCoords[0], storeCoords[1], buyerCoords[0], buyerCoords[1]) : sum.store.distance;
+
                     const newOrder = {
                         id: 'wmord_' + now + '_' + Math.random().toString(36).substr(2, 4),
                         ownerUserId: this.getCurrentUserId(),
@@ -19415,7 +19843,10 @@ ${historyLines}
                         recipientCharName: curAddr.name,
                         storeId: sum.store.id,
                         storeName: sum.store.name,
-                        storeDistance: sum.store.distance,
+                        storeAddress: sum.store.address || `${sum.store.name}总店`,
+                        storeCoords: storeCoords,
+                        buyerCoords: buyerCoords,
+                        storeDistance: realComputedDist,
                         deliveryMins: sum.store.deliveryMins || 28,
                         items: sum.items,
                         foodsPrice: sum.foodsPrice,
@@ -20547,22 +20978,31 @@ ${roleDesc}
                         const conf = this.getApiConfig();
                         this.showAlert(isSearch ? `正在搜索「${keyword}」...` : `正在刷新「${catMeta.name}」...`, `正在调用 API 生成 ${countInfo.label} 家店铺内容...`, true);
 
+                        const buyerBaseCoords = this.resolveAddressCoords(curLocationDesc);
+                        const isRealMap = this.isRealMapMode();
+
                         const sysPrompt = `你是本地生活外卖平台的商家生成引擎（注意：严禁在任何店名或描述中出现“美团”二字）。
-【当前顾客配送收货地址】：${curLocationDesc}
-【地理与地域特色要求】：请务必仔细分析上述收货地址所在的具体城市、省份或地域特色（若地址中包含城市如广州、成都、北京、长沙、西安等，或者标志性地段），在生成店铺名称、招牌菜品、小吃口味、店铺公告和评价时，深度融合该地区的本土饮食文化与方言习惯（如：广东地区融入早茶生滚粥烧腊糖水、川渝地区突出麻辣鲜香地道江湖菜、北方地区突出铜锅涮肉面食饺子等），同时搭配一些全国连锁品牌店，确保极高的真实地域代入感！
+【当前顾客配送收货地址】：${curLocationDesc}（参考基准坐标约为：纬度 ${buyerBaseCoords[0]}, 经度 ${buyerBaseCoords[1]}）
+【地理与地域特色要求】：请务必仔细分析上述收货地址所在的具体城市、省份或地域特色（若地址中包含城市如广州、成都、北京、长沙、西安等，或者标志性地段；若是动漫/架空地址，请结合该地址的繁华风格映射真实街区坐标），在生成店铺名称、具体店铺街道地址（address）、经纬度坐标（lat, lng）、招牌菜品、小吃口味、店铺公告和评价时，深度融合该地区的本土饮食文化与真实街道名！
 ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述收货地址的地域环境，生成 ${countInfo.label} 家（本次请固定输出 ${countInfo.count} 家）与「${keyword}」高度匹配的特色外卖店铺！` : `当前分类为：「${catMeta.name}」，请结合上述收货地址的地域环境，生成 ${countInfo.label} 家（本次请固定输出 ${countInfo.count} 家）符合该分类的优质外卖店铺！`}
 
 每家店铺必须严格遵守以下要求：
-1. 店铺公告（notice）：必须为每家店铺编写一段符合该店业态特色的专属店铺公告（约20~45字，将用于跑马灯滚动展示，不同类型店铺的公告话术要各有特色）。
-2. 榜单与满减标签：rankTag 统一使用“本区xxx榜第x名”格式；promoTags 包含 2~3 个满减或优惠标签（如 ["25减6", "50减12"]，严禁出现“极速退”字样）。
-3. 左侧商品分类（rawCats）：每家店铺必须生成 5 至 8 个特色分类（不能少于5个分类），且每个分类的名称（catName）必须严格控制在 5 个字以内（最多5个字，如“招牌必点”、“时令果茶”、“快充线材”等）。
-4. 分类内商品（items）：每个分类下包含 3 至 5 个具体的商品（含商品名、匹配的单个emoji、价格数字、规格类型specType: "dish"/"spicy_dish"/"drink"/"west"/"none"、简短描述）。
-5. 店铺评价（reviews）：包含 5 条不同食客/买家的真实走心评价，评价内容必须紧扣该店铺售卖的具体商品与服务类型。
+1. 店铺地址与真实经纬度（address, lat, lng, buyerLat, buyerLng）：请先推算顾客收货地址的真实经纬度填入 buyerLat 和 buyerLng；再为每家店铺生成距离顾客收货地址 0.5km~3.5km 范围内的真实街道门牌地址（address），并给出对应的真实纬度（lat）和经度（lng）。
+2. 店铺公告（notice）：必须为每家店铺编写一段符合该店业态特色的专属店铺公告（约20~45字，将用于跑马灯滚动展示，不同类型店铺的公告话术要各有特色）。
+3. 榜单与满减标签：rankTag 统一使用“本区xxx榜第x名”格式；promoTags 包含 2~3 个满减或优惠标签（如 ["25减6", "50减12"]，注意是外卖平台，禁止出现“包邮”、“免运费”、“极速退”这种字样）。
+4. 左侧商品分类（rawCats）：每家店铺必须生成 5 至 8 个特色分类（不能少于5个分类），且每个分类的名称（catName）必须严格控制在 5 个字以内（最多5个字，如“招牌必点”、“时令果茶”、“快充线材”等）。
+5. 分类内商品（items）：每个分类下包含 3 至 5 个具体的商品（含商品名、匹配的单个emoji、价格数字、规格类型specType: "dish"/"spicy_dish"/"drink"/"west"/"none"、简短描述）。
+6. 店铺评价（reviews）：包含 5 条不同食客/买家的真实走心评价，评价内容必须紧扣该店铺售卖的具体商品与服务类型。
 
 直接输出纯 JSON 数组，严禁 markdown 代码块包裹，格式严格如下：
 [
   {
     "name": "店铺名称",
+    "address": "距离收货地1~3km内的具体街道门牌号地址",
+    "lat": 31.2356,
+    "lng": 121.4682,
+    "buyerLat": 31.2278,
+    "buyerLng": 121.4586,
     "notice": "店铺专属特色公告内容，详细介绍本店特色与服务保障",
     "score": 4.9,
     "monthlySales": 3500,
@@ -20608,23 +21048,41 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
                         let arr = this.safeParseJson(data.choices?.[0]?.message?.content || '');
                         if (!Array.isArray(arr)) arr = arr.stores || [];
 
+                        // 若 AI 返回了精准的收货地经纬度，同步写回当前收货地址对象中保存
+                        if (curAddr && arr[0] && arr[0].buyerLat && arr[0].buyerLng) {
+                            curAddr.lat = parseFloat(arr[0].buyerLat);
+                            curAddr.lng = parseFloat(arr[0].buyerLng);
+                        }
+                        const finalBuyerLat = (curAddr && curAddr.lat) ? curAddr.lat : buyerBaseCoords[0];
+                        const finalBuyerLng = (curAddr && curAddr.lng) ? curAddr.lng : buyerBaseCoords[1];
+
                         const builtStores = arr.map((st, idx) => {
                             const cleanedCats = (Array.isArray(st.rawCats) ? st.rawCats : []).map(rc => ({
                                 catName: String(rc.catName || '精选推荐').trim().substring(0, 5),
                                 items: Array.isArray(rc.items) ? rc.items : []
                             }));
                             const cleanedPromos = (Array.isArray(st.promoTags) ? st.promoTags : ['25减6', '50减12', '新客减3']).filter(t => !String(t).includes('极速退'));
+
+                            const stLat = parseFloat(st.lat) || (finalBuyerLat + ((idx % 2 === 0 ? 1 : -1) * (0.006 + idx * 0.0025)));
+                            const stLng = parseFloat(st.lng) || (finalBuyerLng + ((idx % 3 === 0 ? 1 : -1) * (0.007 + idx * 0.0028)));
+                            const realKmStr = this.calcRealDistanceKm(stLat, stLng, finalBuyerLat, finalBuyerLng);
+                            const realKmNum = parseFloat(realKmStr) || 1.4;
+                            const realMins = Math.max(18, Math.min(55, Math.round(15 + realKmNum * 7)));
+
                             return this.createStoreEntity({
                                 id: `wm_api_${Date.now()}_${idx}`,
                                 name: String(st.name || '甄选外卖店').replace(/美团/g, '外卖'),
+                                address: st.address || `${curLocationDesc.substring(0, 4)}中心街${68 + idx * 12}号`,
+                                lat: stLat,
+                                lng: stLng,
                                 notice: st.notice ? String(st.notice).trim() : '',
                                 cats: [this.currentCategory],
                                 score: parseFloat(st.score) || 4.9,
                                 monthlySales: parseInt(st.monthlySales) || 2600,
                                 minOrder: parseFloat(st.minOrder) || 20,
                                 deliveryFee: parseFloat(st.deliveryFee) || 0,
-                                distance: st.distance || '1.4km',
-                                deliveryMins: parseInt(st.deliveryMins) || 28,
+                                distance: isRealMap ? realKmStr : (st.distance || '1.4km'),
+                                deliveryMins: isRealMap ? realMins : (parseInt(st.deliveryMins) || 28),
                                 rankTag: st.rankTag || '本区好评热销榜',
                                 promoTags: cleanedPromos.length > 0 ? cleanedPromos : ['25减6', '50减12'],
                                 rawCats: cleanedCats,
@@ -20732,12 +21190,29 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
                     const s = appData.waimai.settings;
                     this.selectApiEngine(s.apiEngine || 'api');
                     this.setDeliveryMode(s.deliveryMode || 'realistic');
+                    this.setMapMode(s.mapMode || 'virtual');
                     document.getElementById('wm-set-cust-step-sec').value = s.customStepSecs || 15;
                     const minEl = document.getElementById('wm-set-store-min');
                     const maxEl = document.getElementById('wm-set-store-max');
                     if (minEl) minEl.value = s.storeGenMin !== undefined ? s.storeGenMin : 5;
                     if (maxEl) maxEl.value = s.storeGenMax !== undefined ? s.storeGenMax : 8;
                     document.getElementById('wm-subpage-settings').classList.add('show');
+                },
+
+                setMapMode: function(mode) {
+                    appData.waimai.settings.mapMode = mode;
+                    const vBtn = document.getElementById('wm-set-map-virtual');
+                    const rBtn = document.getElementById('wm-set-map-real');
+                    const vTip = document.getElementById('wm-set-map-virtual-tip');
+                    const rTip = document.getElementById('wm-set-map-real-tip');
+                    if (vBtn) { vBtn.style.background = mode === 'virtual' ? '#111' : '#f2f2f5'; vBtn.style.color = mode === 'virtual' ? '#ffd100' : '#555'; }
+                    if (rBtn) { rBtn.style.background = mode === 'real' ? '#111' : '#f2f2f5'; rBtn.style.color = mode === 'real' ? '#ffd100' : '#555'; }
+                    if (vTip) vTip.style.display = mode === 'virtual' ? 'block' : 'none';
+                    if (rTip) rTip.style.display = mode === 'real' ? 'block' : 'none';
+                    if (mode === 'real') {
+                        this.ensureLeafletLoaded();
+                    }
+                    this.save();
                 },
 
                 selectApiEngine: function(eng) {
