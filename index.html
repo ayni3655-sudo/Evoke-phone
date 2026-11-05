@@ -17223,7 +17223,7 @@ ${historyLines}
                 align-items: center;
                 white-space: nowrap;
                 will-change: transform;
-                animation: wmNoticeSeamless 14s linear infinite;
+                animation: wmNoticeSeamless 14s linear 1.5s infinite both;
             }
             .wm-notice-marquee-text {
                 display: inline-block;
@@ -17434,10 +17434,11 @@ ${historyLines}
                 <!-- 店铺头部招牌信息卡片 -->
                 <div id="wm-store-header-banner" style="padding:12px 16px; background:#ffffff; border-bottom:0.5px solid #f0f0f2; flex-shrink:0;"></div>
 
-                <!-- 点菜 / 评价 切换栏 -->
+                <!-- 点菜 / 评价 / 商家 切换栏 -->
                 <div style="display:flex; background:#ffffff; border-bottom:0.5px solid #ececef; padding:0 16px; gap:28px; flex-shrink:0;">
                     <div id="wm-store-tab-menu" onclick="window.WaimaiApp.switchStoreInnerTab('menu')" style="padding:11px 0; font-size:14px; font-weight:800; color:#111; border-bottom:3px solid #ffd100; cursor:pointer;">点菜</div>
                     <div id="wm-store-tab-rev" onclick="window.WaimaiApp.switchStoreInnerTab('reviews')" style="padding:11px 0; font-size:14px; font-weight:600; color:#8e8e93; border-bottom:3px solid transparent; cursor:pointer;">评价 <span id="wm-store-rev-count-badge" style="font-size:11px;">(5)</span></div>
+                    <div id="wm-store-tab-info" onclick="window.WaimaiApp.switchStoreInnerTab('info')" style="padding:11px 0; font-size:14px; font-weight:600; color:#8e8e93; border-bottom:3px solid transparent; cursor:pointer;">商家</div>
                 </div>
 
                 <!-- 点菜视图（左分类 + 右菜品） -->
@@ -17448,6 +17449,9 @@ ${historyLines}
 
                 <!-- 评价视图 -->
                 <div id="wm-store-reviews-view" style="display:none; flex:1; overflow-y:auto; padding:14px 16px 80px 16px; flex-direction:column; gap:12px; background:#f5f5f7;"></div>
+
+                <!-- 商家视图（纯代码SVG绘制高定美团风商家档案） -->
+                <div id="wm-store-info-view" style="display:none; flex:1; overflow-y:auto; padding:12px 14px 80px 14px; flex-direction:column; gap:12px; background:#f5f5f7;"></div>
 
                 <!-- 已选购物车展开抽屉 -->
                 <div class="wm-sheet-mask" id="wm-cart-detail-sheet" onclick="if(event.target===this) this.style.display='none';">
@@ -19123,7 +19127,6 @@ ${historyLines}
                             <div style="font-size:11.5px; color:#555; margin-top:4px;">
                                 <span style="color:#ff6b00; font-weight:800;">★ ${st.score}</span> · 月售${st.monthlySales}+ · 约${st.deliveryMins}分钟 · 距离${st.distance}
                             </div>
-                            ${st.address ? `<div style="font-size:11px; color:#666; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">📍 商家地址：${st.address}</div>` : ''}
                             <div class="wm-notice-bar">
                                 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#8e8e93" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; display:block;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>
                                 <div class="wm-notice-marquee-wrap">
@@ -19139,6 +19142,7 @@ ${historyLines}
                     this.switchStoreInnerTab('menu');
                     this.renderStoreMenu();
                     this.renderStoreReviews();
+                    this.renderStoreMerchantInfo();
                     this.updateCartBarUI();
                     document.getElementById('wm-subpage-store').classList.add('show');
                 },
@@ -19155,23 +19159,188 @@ ${historyLines}
                 switchStoreInnerTab: function(tab) {
                     const mTab = document.getElementById('wm-store-tab-menu');
                     const rTab = document.getElementById('wm-store-tab-rev');
+                    const iTab = document.getElementById('wm-store-tab-info');
                     const mView = document.getElementById('wm-store-menu-view');
                     const rView = document.getElementById('wm-store-reviews-view');
+                    const iView = document.getElementById('wm-store-info-view');
                     const cartBar = document.getElementById('wm-cart-bar');
 
+                    [mTab, rTab, iTab].forEach(el => {
+                        if (el) {
+                            el.style.fontWeight = '600';
+                            el.style.color = '#8e8e93';
+                            el.style.borderBottomColor = 'transparent';
+                        }
+                    });
+
                     if (tab === 'menu') {
-                        mTab.style.fontWeight = '800'; mTab.style.color = '#111'; mTab.style.borderBottomColor = '#ffd100';
-                        rTab.style.fontWeight = '600'; rTab.style.color = '#8e8e93'; rTab.style.borderBottomColor = 'transparent';
-                        mView.style.display = 'flex';
-                        rView.style.display = 'none';
+                        if (mTab) { mTab.style.fontWeight = '800'; mTab.style.color = '#111'; mTab.style.borderBottomColor = '#ffd100'; }
+                        if (mView) mView.style.display = 'flex';
+                        if (rView) rView.style.display = 'none';
+                        if (iView) iView.style.display = 'none';
                         this.updateCartBarUI();
-                    } else {
-                        rTab.style.fontWeight = '800'; rTab.style.color = '#111'; rTab.style.borderBottomColor = '#ffd100';
-                        mTab.style.fontWeight = '600'; mTab.style.color = '#8e8e93'; mTab.style.borderBottomColor = 'transparent';
-                        mView.style.display = 'none';
-                        rView.style.display = 'flex';
+                    } else if (tab === 'reviews') {
+                        if (rTab) { rTab.style.fontWeight = '800'; rTab.style.color = '#111'; rTab.style.borderBottomColor = '#ffd100'; }
+                        if (mView) mView.style.display = 'none';
+                        if (rView) rView.style.display = 'flex';
+                        if (iView) iView.style.display = 'none';
+                        if (cartBar) cartBar.style.display = 'none';
+                    } else if (tab === 'info') {
+                        if (iTab) { iTab.style.fontWeight = '800'; iTab.style.color = '#111'; iTab.style.borderBottomColor = '#ffd100'; }
+                        if (mView) mView.style.display = 'none';
+                        if (rView) rView.style.display = 'none';
+                        if (iView) iView.style.display = 'flex';
                         if (cartBar) cartBar.style.display = 'none';
                     }
+                },
+
+                // 渲染美团风纯SVG「商家」详情页（竖排展示店名、地址、公告及固定装饰项，全页无Emoji）
+                renderStoreMerchantInfo: function() {
+                    const st = this.findStoreById(this.activeStoreId);
+                    const infoView = document.getElementById('wm-store-info-view');
+                    if (!st || !infoView) return;
+
+                    // 根据店铺ID或名称生成稳定的脱敏商家电话与营业时间
+                    let hash = 0;
+                    const sName = String(st.name || '美食');
+                    for (let i = 0; i < sName.length; i++) hash = sName.charCodeAt(i) + ((hash << 5) - hash);
+                    const tailNum = 1000 + (Math.abs(hash) % 8999);
+                    const phonePrefix = ['138', '139', '158', '186', '135', '189'][Math.abs(hash) % 6];
+                    const maskedPhone = `${phonePrefix}****${tailNum}`;
+                    const is24h = sName.includes('24h') || sName.includes('药') || sName.includes('便利');
+                    const openHours = is24h ? '00:00 - 24:00 (全天营业)' : '09:00 - 23:30';
+                    const storeAddr = st.address || '中心城区繁华商业街88号1层';
+                    const storeNotice = st.notice || '欢迎光临本店，全场甄选新鲜食材现点现做，如有忌口请在结算页备注。';
+
+                    const promosHtml = (st.promoTags || ['25减6', '50减12']).map(p => `
+                        <span style="font-size:11px; font-weight:600; color:#e53935; background:#ffebee; padding:2px 7px; border-radius:4px; border:0.5px solid rgba(229,57,53,0.2);">${p}</span>
+                    `).join('');
+
+                    infoView.innerHTML = `
+                    <!-- 卡片1：商家名称、地址、公告（竖排列表，纯SVG图标前置，无冗余标签字） -->
+                    <div style="background:#ffffff; border-radius:14px; padding:4px 16px; display:flex; flex-direction:column; box-shadow:0 2px 8px rgba(0,0,0,0.02);">
+                        <!-- 1. 店铺名称行 -->
+                        <div style="display:flex; align-items:center; gap:12px; padding:14px 0; border-bottom:0.5px solid #f0f0f2;">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#222222" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+                                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                                <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                            </svg>
+                            <div style="font-size:15px; font-weight:800; color:#111111; line-height:1.35; flex:1;">${st.name}</div>
+                        </div>
+
+                        <!-- 2. 店铺地址行（右侧带竖线与电话拨打图标装饰） -->
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 0; border-bottom:0.5px solid #f0f0f2;">
+                            <div style="display:flex; align-items:flex-start; gap:12px; flex:1; min-width:0;">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#222222" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; margin-top:1px;">
+                                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                    <circle cx="12" cy="10" r="3"></circle>
+                                </svg>
+                                <div style="font-size:13.5px; font-weight:600; color:#222222; line-height:1.45;">
+                                    ${storeAddr}
+                                    <div style="font-size:11.5px; color:#8e8e93; font-weight:400; margin-top:2px;">距您 ${st.distance || '1.4km'} · 骑行约 ${st.deliveryMins || 28} 分钟</div>
+                                </div>
+                            </div>
+                            <div onclick="window.WaimaiApp.showAlert('联系商家电话', '商家隐私保护号码：${maskedPhone}\\n您可以点击右上角气泡图标在线联系商家客服')" style="padding-left:14px; border-left:0.5px solid #e5e5ea; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; color:#111111;" title="拨打商家电话">
+                                <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#111111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                                </svg>
+                            </div>
+                        </div>
+
+                        <!-- 3. 店铺公告行 -->
+                        <div style="display:flex; align-items:flex-start; gap:12px; padding:14px 0;">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#222222" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; margin-top:2px;">
+                                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                                <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+                            </svg>
+                            <div style="font-size:13px; color:#555555; line-height:1.6; flex:1;">${storeNotice}</div>
+                        </div>
+                    </div>
+
+                    <!-- 卡片2：配送时间、配送服务、商家电话 -->
+                    <div style="background:#ffffff; border-radius:14px; padding:4px 16px; display:flex; flex-direction:column; box-shadow:0 2px 8px rgba(0,0,0,0.02);">
+                        <!-- 配送时间 -->
+                        <div style="display:flex; align-items:center; gap:12px; padding:13px 0; border-bottom:0.5px solid #f0f0f2;">
+                            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#555555" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <polyline points="12 6 12 12 16 14"></polyline>
+                            </svg>
+                            <div style="font-size:13px; color:#222222; flex:1;">
+                                <span style="color:#666666;">配送时间：</span><span style="font-weight:700; color:#111111;">${openHours}</span>
+                            </div>
+                        </div>
+
+                        <!-- 配送服务 -->
+                        <div style="display:flex; align-items:center; gap:12px; padding:13px 0; border-bottom:0.5px solid #f0f0f2;">
+                            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#555555" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                            </svg>
+                            <div style="font-size:13px; color:#222222; flex:1;">
+                                <span style="color:#666666;">配送服务：</span><span style="font-weight:700; color:#111111;">提供高品质准时保温配送服务</span>
+                            </div>
+                        </div>
+
+                        <!-- 商家电话 -->
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:13px 0;">
+                            <div style="display:flex; align-items:center; gap:12px;">
+                                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#555555" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+                                    <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+                                    <line x1="12" y1="18" x2="12.01" y2="18"></line>
+                                </svg>
+                                <div style="font-size:13px; color:#222222;">
+                                    <span style="color:#666666;">商家电话：</span><span style="font-weight:700; font-family:monospace; color:#111111;">${maskedPhone}</span>
+                                </div>
+                            </div>
+                            <span style="font-size:11px; color:#8e8e93;"></span>
+                        </div>
+                    </div>
+
+                    <!-- 卡片3：商家服务、优惠活动与食品安全档案 -->
+                    <div style="background:#ffffff; border-radius:14px; padding:4px 16px; display:flex; flex-direction:column; box-shadow:0 2px 8px rgba(0,0,0,0.02);">
+                        <!-- 满减优惠 -->
+                        <div style="display:flex; align-items:center; gap:12px; padding:13px 0; border-bottom:0.5px solid #f0f0f2;">
+                            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#e53935" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+                                <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+                                <line x1="7" y1="7" x2="7.01" y2="7"></line>
+                            </svg>
+                            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; flex:1;">
+                                <span style="font-size:13px; color:#666666;">店铺活动：</span>
+                                ${promosHtml}
+                            </div>
+                        </div>
+
+                        <!-- 商家服务保障 -->
+                        <div style="display:flex; align-items:center; gap:12px; padding:13px 0; border-bottom:0.5px solid #f0f0f2;">
+                            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#2e7d32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                            </svg>
+                            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; flex:1;">
+                                <span style="font-size:13px; color:#666666;">商家服务：</span>
+                                <span style="font-size:11px; color:#555; background:#f5f5f7; padding:2px 7px; border-radius:4px;">食安封签</span>
+                                <span style="font-size:11px; color:#555; background:#f5f5f7; padding:2px 7px; border-radius:4px;">准时宝保障</span>
+                                <span style="font-size:11px; color:#555; background:#f5f5f7; padding:2px 7px; border-radius:4px;">支持开发票</span>
+                            </div>
+                        </div>
+
+                        <!-- 食品安全档案与营业资质 -->
+                        <div onclick="window.WaimaiApp.showAlert('食品安全监督量化档案', '店铺名称：${st.name}\\n经营地址：${storeAddr}\\n食品安全等级：A级（优秀）\\n许可证状态：已通过平台实名与现场核验。')" style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:13px 0; cursor:pointer;">
+                            <div style="display:flex; align-items:center; gap:12px;">
+                                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#555555" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+                                    <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+                                    <line x1="7" y1="8" x2="17" y2="8"></line>
+                                    <line x1="7" y1="12" x2="17" y2="12"></line>
+                                    <line x1="7" y1="16" x2="12" y2="16"></line>
+                                </svg>
+                                <div style="font-size:13px; color:#222222; font-weight:600;">查看食品安全档案与营业资质</div>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                <span style="font-size:11px; font-weight:700; color:#2e7d32; background:#e8f5e9; padding:2px 6px; border-radius:4px;">A级优秀</span>
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#8e8e93" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                            </div>
+                        </div>
+                    </div>`;
                 },
 
                 renderStoreMenu: function() {
