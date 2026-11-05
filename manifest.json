@@ -2,7 +2,7 @@
   "id": "./index.html?v=2",
   "name": "Evoke",
   "short_name": "Evoke",
-  "start_url": "./index.html?v=2",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#fafafa",
   "theme_color": "#fafafa",
