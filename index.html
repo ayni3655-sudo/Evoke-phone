@@ -6474,7 +6474,7 @@ chat: async function(messages, systemPrompt, charId) {
                     this.initData();
                     const ctn = document.getElementById('user-card-list');
                     if (!appData.settings.userList || appData.settings.userList.length === 0) {
-                        ctn.innerHTML = '<div style="text-align:center; padding:60px 20px; color:#a3a3a3; font-size:13px;">暂无面具档案，点击右上角收录新面具。</div>';
+                        ctn.innerHTML = '<div style="text-align:center; padding:60px 20px; color:#a3a3a3; font-size:13px;">暂无面具，点击右上角新增面具</div>';
                         return;
                     }
                     let html = '';
@@ -9686,7 +9686,7 @@ if (badgeEl) {
 
                     // 2. 渲染主角角色卡（带置顶与主题色）
                     if (mainCards.length === 0) {
-                        charCtn.innerHTML = '<div style="text-align:center; padding:60px 20px; color:#a3a3a3; font-size: 13px; font-family: sans-serif;">暂无主角档案，点击右上角收录新角色。</div>';
+                        charCtn.innerHTML = '<div style="text-align:center; padding:60px 20px; color:#a3a3a3; font-size: 13px; font-family: sans-serif;">暂无主角档案，点击右上角新增角色</div>';
                     } else {
                         let sortedCards = [...mainCards].sort((a, b) => {
                             const timeA = a.pinnedAt || Infinity;
@@ -9759,7 +9759,7 @@ if (badgeEl) {
 
                     // 3. 渲染 NPC 极简列表（按时间倒序：新建在前）
                     if (npcCards.length === 0) {
-                        npcCtn.innerHTML = '<div style="text-align:center; padding:60px 20px; color:#8e8e8e; font-size:13px;">暂无配角 NPC，点击右上角收录新配角。</div>';
+                        npcCtn.innerHTML = '<div style="text-align:center; padding:60px 20px; color:#8e8e8e; font-size:13px;">暂无NPC，点击右上角新增配角</div>';
                     } else {
                         // 新建的 NPC 排在前面
                         let sortedNpc = [...npcCards].sort((a, b) => (parseInt(b.id.replace(/\D/g, '') || 0) - parseInt(a.id.replace(/\D/g, '') || 0)));
@@ -12274,7 +12274,7 @@ if (badgeEl) {
 
                     const sortedCards = this.getSortedMemoryCards();
                     if (sortedCards.length === 0) {
-                        ctn.innerHTML = `<div style="text-align:center; padding:60px 20px; color:#8e8e93; font-size:13px;">暂无主角角色档案，请先在「角色卡」中创建角色。</div>`;
+                        ctn.innerHTML = `<div style="text-align:center; padding:60px 20px; color:#8e8e93; font-size:13px;">暂无主角角色档案，请先在「角色卡」中创建角色</div>`;
                         return;
                     }
 
@@ -17973,6 +17973,8 @@ ${historyLines}
                             const st = document.createElement('style');
                             st.id = 'wm-leaflet-custom-style';
                             st.innerHTML = `
+                                .wm-real-map-box { isolation: isolate; z-index: 1; }
+                                .wm-real-map-box .leaflet-container { touch-action: none !important; -webkit-user-select: none; user-select: none; z-index: 1 !important; }
                                 .wm-real-map-box .leaflet-control-attribution { display: none !important; }
                                 .wm-real-map-box .leaflet-div-icon { background: transparent !important; border: none !important; }
                             `;
@@ -18787,15 +18789,15 @@ ${historyLines}
 
                         const curSource = this.tileSources[this._tileSourceIdx % this.tileSources.length];
                         return `
-                        <div class="wm-real-map-box" style="width:100%; height:${heightPx}px; border-radius:16px; overflow:hidden; position:relative; border:0.5px solid rgba(0,0,0,0.1); box-shadow:0 2px 10px rgba(0,0,0,0.04); touch-action:none;"
-                             ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();" onmousedown="event.stopPropagation();" onclick="event.stopPropagation();">
+                        <div class="wm-real-map-box" style="width:100%; height:${heightPx}px; border-radius:16px; overflow:hidden; position:relative; z-index:1; isolation:isolate; border:0.5px solid rgba(0,0,0,0.1); box-shadow:0 2px 10px rgba(0,0,0,0.04);"
+                             onclick="event.stopPropagation();">
                             <div id="${domId}" style="width:100%; height:100%; background:#eef2f6; z-index:1;"></div>
-                            <div style="position:absolute; top:8px; right:8px; z-index:400; display:flex;">
+                            <div style="position:absolute; top:8px; right:8px; z-index:10; display:flex;">
                                 <div onclick="event.stopPropagation(); window.WaimaiApp.switchMapTileSource('${domId}', '${order.id}', ${heightPx});" style="background:rgba(255,255,255,0.92); backdrop-filter:blur(6px); padding:4px 10px; border-radius:8px; font-size:10px; font-weight:800; color:#111; border:0.5px solid rgba(0,0,0,0.12); cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
                                     切换图源 (${curSource.name})
                                 </div>
                             </div>
-                            <div style="position:absolute; bottom:8px; left:10px; z-index:400; background:rgba(255,255,255,0.92); backdrop-filter:blur(4px); padding:3px 8px; border-radius:6px; font-size:10px; font-weight:700; color:#1677ff; border:0.5px solid rgba(22,119,255,0.2); pointer-events:none;">
+                            <div style="position:absolute; bottom:8px; left:10px; z-index:10; background:rgba(255,255,255,0.92); backdrop-filter:blur(4px); padding:3px 8px; border-radius:6px; font-size:10px; font-weight:700; color:#1677ff; border:0.5px solid rgba(22,119,255,0.2); pointer-events:none;">
                                 ${hasRider ? `实时导航 · 骑手${order.riderName || '王师傅'} (可拖拽缩放)` : `实时定位 · ${order.storeAddress || order.storeName}`}
                             </div>
                         </div>`;
@@ -18931,12 +18933,19 @@ ${historyLines}
                     const containerEl = document.getElementById(domId);
                     if (!containerEl) return;
 
+                    L.DomEvent.disableClickPropagation(containerEl);
+                    L.DomEvent.disableScrollPropagation(containerEl);
+
                     const map = L.map(containerEl, {
                         zoomControl: true,
                         attributionControl: false,
                         dragging: true,
                         touchZoom: true,
-                        scrollWheelZoom: true
+                        scrollWheelZoom: true,
+                        doubleClickZoom: true,
+                        boxZoom: true,
+                        tap: false,
+                        bounceAtZoomLimits: false
                     });
                     this._mapInstances[domId] = map;
 
@@ -19094,7 +19103,7 @@ ${historyLines}
                         ${this.buildAmapSvgHtml(activeOrd, 136)}
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; font-size:11.5px; color:#666;">
                             <span>🍱 ${activeOrd.storeName} (${activeOrd.items.length}件商品)</span>
-                            <span style="color:#111; font-weight:700;">点击进入详情追踪</span>
+                            <span style="color:#111; font-weight:700;">点击进入详情</span>
                         </div>
                     </div>`;
                 },
@@ -24928,7 +24937,7 @@ ${artifactsPromptList}
                     const cards = appData.charCards || [];
 
                     if (cards.length === 0) {
-                        ctn.innerHTML = `<div style="grid-column: span 2; text-align:center; padding:60px 20px; color:#8e8e93; font-size:13px;">暂无角色档案，请先在角色卡中添加角色。</div>`;
+                        ctn.innerHTML = `<div style="grid-column: span 2; text-align:center; padding:60px 20px; color:#8e8e93; font-size:13px;">暂无角色档案，请先在角色卡中添加角色</div>`;
                         return;
                     }
 
@@ -39260,7 +39269,7 @@ ${storyTextRule}
                 renderList: function() {
                     const ctn = document.getElementById('story-list-container');
                     if (appData.stories.length === 0) {
-                        ctn.innerHTML = `<div style="grid-column: span 2; text-align:center; padding:60px 20px; color:#a3a3a3; font-size:13px;">暂无档案，点击右上角收录新卷。</div>`;
+                        ctn.innerHTML = `<div style="grid-column: span 2; text-align:center; padding:60px 20px; color:#a3a3a3; font-size:13px;">暂无档案，点击右上角新增剧本</div>`;
                         return;
                     }
                     
@@ -40670,7 +40679,7 @@ ${storyTextRule}
             let posts = [...(this.data.homePosts || [])].sort((a, b) => (b.ts || 0) - (a.ts || 0));
 
             if (posts.length === 0) {
-                list.innerHTML = `<div style="text-align:center; padding:70px 20px; color:#8e8e93; font-size:14px;">推荐流空空如也，点击右上角刷新按钮获取新博客。</div>`;
+                list.innerHTML = `<div style="text-align:center; padding:70px 20px; color:#8e8e93; font-size:14px;">推荐流空空如也，点击右上角刷新按钮获取新博客</div>`;
                 return;
             }
             list.innerHTML = posts.map(p => this.buildPostHtml(p)).join('');
@@ -45931,7 +45940,7 @@ Ling-2.6：高冷文艺、深沉思考者。`;
             this.safeInit();
             const list = document.getElementById('fm-home-list');
             if (!list) return;
-            if (this.data.length === 0) { list.innerHTML = `<div style="text-align:center; padding:60px 20px; color:#8e8e8e; font-size:14px;">论坛空空如也，点击右上角刷新。</div>`; return; }
+            if (this.data.length === 0) { list.innerHTML = `<div style="text-align:center; padding:60px 20px; color:#8e8e8e; font-size:14px;">论坛空空如也，点击右上角刷新</div>`; return; }
             
             let sorted = [...this.data].sort((a, b) => (b.ts || 0) - (a.ts || 0));
             list.innerHTML = sorted.map(p => {
@@ -48923,7 +48932,7 @@ ${modelReply}
 
         renderChatList: function() {
             const ctn = document.getElementById('wx-chat-list');
-            if (appData.chats.length === 0 && this.currentContactTab === 'friends') { ctn.innerHTML = '<div style="text-align:center; padding:40px; color:#8e8e8e; font-size:13px;">暂无聊天，点击右上角发起。</div>'; return; }
+            if (appData.chats.length === 0 && this.currentContactTab === 'friends') { ctn.innerHTML = '<div style="text-align:center; padding:40px; color:#8e8e8e; font-size:13px;">暂无聊天，点击右上角发起</div>'; return; }
             
             let html = '';
 
