@@ -22338,7 +22338,7 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
                 <!-- 为你推荐：国内外 5 大内置热门景点横向滑动区 (左侧对齐 16px + 右侧箭头按钮 + 自动填满剩余高度) -->
                 <div style="flex:1; min-height:0; display:flex; flex-direction:column; margin:2px 0 4px 0;">
                     <div style="padding: 4px 16px 8px 16px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
-                        <span style="font-size:16px; font-weight:900; color:#0f172a; letter-spacing:0.2px;">为你推荐 · 灵感目的地</span>
+                        <span style="font-size:16px; font-weight:900; color:#0f172a; letter-spacing:0.2px;">为你推荐</span>
                         <div style="display:flex; align-items:center; gap:8px;">
                             <div class="trv-rec-arrow-btn" onclick="window.TravelApp.scrollRecommendCards(-1)" title="上一张">
                                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
@@ -22872,7 +22872,7 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
                     }
                 ],
 
-                // 内置 5 大国内外热门景区
+                // 内置 5 大国内外热门景区（全部采用可直连加载且 100% 对应地标实景的 Unsplash 专线图源）
                 builtinScenicSpots: [
                     {
                         id: 'builtin_sc_1',
@@ -22884,7 +22884,7 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
                         address: '浙江省杭州市西湖区龙井路1号',
                         price: 45,
                         wikiQuery: 'West Lake Hangzhou',
-                        imageUrl: 'https://images.unsplash.com/photo-1598970434795-0c54fe7c0648?auto=format&fit=crop&w=700&q=80',
+                        imageUrl: 'https://images.unsplash.com/photo-1769628357927-54b9d24e183d?auto=format&fit=crop&w=800&q=80',
                         tags: ['世界文化遗产', '5A级景区', '游船赏景', '随买随用'],
                         intro: '三面云山一面城，西湖以其秀丽的湖光山色和众多的名胜古迹闻名中外。苏堤春晓、断桥残雪、雷峰夕照、三潭印月等十景串联起江南千年的诗意与烟雨，乘手划船荡漾湖心，感受极致江南温婉。',
                         tickets: [
@@ -22907,7 +22907,7 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
                         address: '北京市东城区景山前街4号',
                         price: 60,
                         wikiQuery: 'Forbidden City Beijing',
-                        imageUrl: 'https://images.unsplash.com/photo-1508804185872-d7badad00f7d?auto=format&fit=crop&w=700&q=80',
+                        imageUrl: 'https://images.unsplash.com/photo-1532690671373-229d09573d2e?auto=format&fit=crop&w=800&q=80',
                         tags: ['世界五大宫之首', '国宝馆藏', '皇家建筑群', '实名预约'],
                         intro: '中国明清两代的皇家宫殿，旧称紫禁城。占地七十二万平方米，中轴线上的太和殿、中和殿、保和殿气势恢宏，珍宝馆与钟表馆珍藏着无数旷世国宝，漫步红墙夹道，聆听岁月回响。',
                         tickets: [
@@ -22930,7 +22930,7 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
                         address: '云南省大理白族自治州大理市环海西路磻溪段',
                         price: 68,
                         wikiQuery: 'Erhai Lake Dali',
-                        imageUrl: 'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=700&q=80',
+                        imageUrl: 'https://images.unsplash.com/photo-1769185232537-f4af1b9a06e4?auto=format&fit=crop&w=800&q=80',
                         tags: ['高原明珠', '海鸥伴飞', '网红S弯', '旅拍圣地'],
                         intro: '风花雪月四景之一，澄澈如蓝宝石般的洱海倒映着苍山十九峰的皑皑白雪。沿着磻溪村S弯与海舌公园骑行漫步，水杉林随四季变换色彩，沿途咖啡馆面朝大海，尽享慢节奏浪漫时光。',
                         tickets: [
@@ -22945,7 +22945,7 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
                     },
                     {
                         id: 'builtin_sc_4',
-                        city: '东京/富士山',
+                        city: '富士山',
                         name: '日本富士山·河口湖天上山公园',
                         slogan: '雪顶流云映碧湖，尽揽富士四季绝景',
                         score: 4.9,
@@ -22953,7 +22953,7 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
                         address: '日本山梨县南都留郡富士河口湖町浅川1163-1',
                         price: 120,
                         wikiQuery: 'Mount Fuji Kawaguchiko',
-                        imageUrl: 'https://images.unsplash.com/photo-1490806843957-31f4c9a91c65?auto=format&fit=crop&w=700&q=80',
+                        imageUrl: 'https://images.unsplash.com/photo-1490806843957-31f4c9a91c65?auto=format&fit=crop&w=800&q=80',
                         tags: ['世界遗产', '全景缆车', '逆富士奇观', '绝美机位'],
                         intro: '河口湖是富士五湖中视野最开阔的观景胜地。搭乘天上山公园全景缆车登顶，可将整座白雪皑皑的富士山与波光粼粼的河口湖尽收眼底；湖畔八音盒之森与温泉旅馆相映成趣。',
                         tickets: [
@@ -22974,7 +22974,7 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
                         address: 'Rue de Rivoli, 75001 Paris, France',
                         price: 165,
                         wikiQuery: 'Louvre Museum Paris',
-                        imageUrl: 'https://images.unsplash.com/photo-1549144511-f099e773c147?auto=format&fit=crop&w=700&q=80',
+                        imageUrl: 'https://images.unsplash.com/photo-1543335785-8aadf6d8183c?auto=format&fit=crop&w=800&q=80',
                         tags: ['世界四大博物馆', '镇馆三宝', '免排队通道', '语音导览'],
                         intro: '位居世界四大博物馆之首，贝聿铭设计的透明玻璃金字塔在阳光下熠熠生辉。馆内珍藏《蒙娜丽莎》、《断臂维纳斯》、《萨莫色雷斯的胜利女神》等超过四十万件艺术瑰宝。',
                         tickets: [
@@ -23112,17 +23112,9 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
 
                 preloadAllImages: function() {
                     this.initData();
-                    (this.builtinScenicSpots || []).forEach((spot, idx) => {
-                        this.preloadSingleImage(spot.imageUrl);
-                        if (!spot._wikiFetched && spot.wikiQuery) {
-                            spot._wikiFetched = true;
-                            this.fetchPublicScenicPhotoUrl(spot.wikiQuery, 'scenic', idx).then(url => {
-                                if (url) {
-                                    spot.imageUrl = url;
-                                    this.preloadSingleImage(url);
-                                }
-                            });
-                        }
+                    // 仅预加载内置 5 大景点的精准地标大图，绝不用随机搜索结果覆盖它
+                    (this.builtinScenicSpots || []).forEach(spot => {
+                        if (spot && spot.imageUrl) this.preloadSingleImage(spot.imageUrl);
                     });
                     const cache = appData.travel.cityCache || {};
                     Object.values(cache).forEach(cityData => {
@@ -23719,7 +23711,7 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
                             seats: [
                                 { name: '二等座', price: p2, stock: '有票' },
                                 { name: '一等座', price: p1, stock: '有票' },
-                                { name: '软卧/商务', price: pSlp, stock: '有票' },
+                                { name: '软卧', price: pSlp, stock: '有票' },
                                 { name: '无座', price: p2, stock: '有票' }
                             ]
                         };
