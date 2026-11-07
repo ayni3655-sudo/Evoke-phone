@@ -22410,10 +22410,8 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
             }
             .trv-rec-img-box {
                 width: 100%;
-                height: 120px;
-                min-height: 120px;
-                max-height: 120px;
-                flex-shrink: 0;
+                flex: 1;
+                min-height: 135px;
                 background: linear-gradient(135deg, #e0f2fe 0%, #dbeafe 100%);
                 position: relative;
                 overflow: hidden;
@@ -23749,13 +23747,13 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
                                 <span class="trv-rec-city-tag" style="z-index:2;">${spot.city}</span>
                                 <span class="trv-rec-price-badge" style="z-index:2;">¥${spot.price}起</span>
                             </div>
-                            <div style="padding:11px 14px 14px 14px; display:flex; flex-direction:column; justify-content:space-between; flex:1; min-height:0; background:#ffffff; z-index:3; box-sizing:border-box;">
+                            <div style="padding:12px 14px 14px 14px; display:flex; flex-direction:column; justify-content:space-between; gap:12px; flex-shrink:0; background:#ffffff; z-index:3; box-sizing:border-box;">
                                 <div>
                                     <div style="font-size:14.5px; font-weight:900; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.25;">${spot.name}</div>
                                     <div style="font-size:11.5px; color:#0066ff; font-weight:700; margin-top:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.3;">${spot.slogan}</div>
-                                    <div style="font-size:11px; color:#64748b; margin-top:4px; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; line-height:1.42;">${spot.intro}</div>
+                                    <div style="font-size:11px; color:#64748b; margin-top:4px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; line-height:1.45;">${spot.intro}</div>
                                 </div>
-                                <div style="display:flex; align-items:center; justify-content:space-between; padding-top:9px; margin-bottom:2px; border-top:0.5px solid #f1f5f9; font-size:11px; color:#64748b;">
+                                <div style="display:flex; align-items:center; justify-content:space-between; padding-top:9px; border-top:0.5px solid #f1f5f9; font-size:11px; color:#64748b;">
                                     <span style="color:#f59e0b; font-weight:800;">★ ${spot.score || '4.9'}分</span>
                                     <span style="color:#0066ff; font-weight:700;">点击预订门票 ›</span>
                                 </div>
