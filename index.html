@@ -13992,18 +13992,21 @@ if (badgeEl) {
                             <span>正在云端检索歌曲...</span>
                         </div>`;
 
-                    // 完全对齐故事 APP 的 limit=100 大基数检索，并增加 allorigins 备用代理通道
-                    const neteasePcUrl = 'https://music.163.com/api/cloudsearch/pc?s=' + encodeURIComponent(kw) + '&type=1&offset=0&limit=100';
-                    const neteaseSearchUrl = 'https://music.163.com/api/search/get/web?s=' + encodeURIComponent(kw) + '&type=1&offset=0&total=true&limit=100';
+                    // 7条多源高可用搜歌通道（国内镜像 + 国际代理直连网易云官网 + Meting聚合源）
+                    const neteasePcUrl = 'https://music.163.com/api/cloudsearch/pc?s=' + encodeURIComponent(kw) + '&type=1&offset=0&limit=80';
+                    const neteaseWebUrl = 'https://music.163.com/api/search/get/web?s=' + encodeURIComponent(kw) + '&type=1&offset=0&total=true&limit=80';
                     const endpoints = [
-                        `https://apis.netstart.cn/music/cloudsearch?keywords=${encodeURIComponent(kw)}&limit=100&offset=0&type=1`,
+                        `https://zm.armoe.cn/cloudsearch?keywords=${encodeURIComponent(kw)}&limit=80&offset=0&type=1`,
+                        `https://ncm.zhenxin.me/cloudsearch?keywords=${encodeURIComponent(kw)}&limit=80&offset=0&type=1`,
+                        `https://music-api.heheda.top/cloudsearch?keywords=${encodeURIComponent(kw)}&limit=80&offset=0&type=1`,
+                        `https://corsproxy.io/?${encodeURIComponent(neteasePcUrl)}`,
                         `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(neteasePcUrl)}`,
-                        `https://apis.netstart.cn/music/search?keywords=${encodeURIComponent(kw)}&limit=100&offset=0&type=1`,
-                        `https://api.allorigins.win/raw?url=${encodeURIComponent(neteaseSearchUrl)}`
+                        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(neteaseWebUrl)}`,
+                        `https://api.injahow.cn/meting/?type=search&id=${encodeURIComponent(kw)}`,
+                        `https://api.i-meto.com/meting/api?server=netease&type=search&id=${encodeURIComponent(kw)}`
                     ];
 
-                    // 带 6 秒超时控制的请求器，防止单个节点卡死导致无法切换备用通道
-                    const fetchWithTimeout = async (url, ms = 6000) => {
+                    const fetchWithTimeout = async (url, ms = 5000) => {
                         const ctrl = new AbortController();
                         const timer = setTimeout(() => ctrl.abort(), ms);
                         try {
@@ -14019,13 +14022,26 @@ if (badgeEl) {
                     let rawSongs = [];
                     for (let ep of endpoints) {
                         try {
-                            const res = await fetchWithTimeout(ep, 6000);
+                            const res = await fetchWithTimeout(ep, 5000);
                             if (!res.ok) continue;
-                            const text = await res.text();
-                            if (!text) continue;
-                            const data = JSON.parse(text);
+                            const data = await res.json();
                             if (data?.result?.songs && data.result.songs.length > 0) {
                                 rawSongs = data.result.songs;
+                                break;
+                            } else if (Array.isArray(data) && data.length > 0) {
+                                // 兼容 Meting 接口返回的数组格式，自动转为标准网易云格式
+                                rawSongs = data.map(item => {
+                                    const sidMatch = String(item.url || item.id || '').match(/id=(\d+)/);
+                                    const sid = sidMatch ? sidMatch[1] : String(item.id || Date.now());
+                                    return {
+                                        id: sid,
+                                        name: item.name || item.title || '未知歌曲',
+                                        ar: [{ name: item.artist || item.author || '未知歌手' }],
+                                        al: { picUrl: item.pic || item.cover || '' },
+                                        fee: 0,
+                                        dt: 210000
+                                    };
+                                });
                                 break;
                             }
                         } catch (e) {}
@@ -14045,8 +14061,16 @@ if (badgeEl) {
 
                     const normalized = finalSongs.map(s => {
                         const artists = (s.ar || s.artists || []).map(a => a.name).join(' / ') || '未知歌手';
-                        const rawPic = (s.al && s.al.picUrl) || (s.album && s.album.picUrl) || '';
-                        const cover = rawPic ? `${rawPic.replace(/^http:\/\//i, 'https://')}?param=200y200` : '';
+                        let rawPic = (s.al && s.al.picUrl) || (s.album && s.album.picUrl) || (s.artists && s.artists[0] && s.artists[0].img1v1Url) || '';
+                        rawPic = rawPic.replace(/^http:\/\//i, 'https://');
+                        let cover = '';
+                        if (rawPic) {
+                            // 只有当原链接不含问号参数时，才追加尺寸裁剪参数，防止破坏 Meting 封面重定向链接
+                            cover = rawPic.includes('?') ? rawPic : `${rawPic}?param=300y300`;
+                        } else if (s.id) {
+                            // 如果搜索通道未返回 picUrl，直接用 Meting 封面重定向直链根据歌曲 ID 自动获取真实专辑封面
+                            cover = `https://api.injahow.cn/meting/?type=pic&id=${s.id}`;
+                        }
                         return {
                             id: 'cloud_' + s.id,
                             songId: String(s.id),
@@ -14221,9 +14245,40 @@ if (badgeEl) {
                     this.playTrackAtIndex(this.curTrackIdx);
                 },
 
+                // 异步拉取网易云单曲真实高清专辑封面（当搜索结果缺少直接 picUrl 时自动补全）
+                fetchRealSongCover: async function(track) {
+                    if (!track || track.isCharSong || !track.songId) return;
+                    if (track.cover && track.cover.includes('music.126.net')) return;
+                    const sid = track.songId;
+                    const detailEndpoints = [
+                        `https://zm.armoe.cn/song/detail?ids=${sid}`,
+                        `https://ncm.zhenxin.me/song/detail?ids=${sid}`,
+                        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent('https://music.163.com/api/song/detail/?id=' + sid + '&ids=[' + sid + ']')}`
+                    ];
+                    for (let ep of detailEndpoints) {
+                        try {
+                            const res = await fetch(ep);
+                            if (!res.ok) continue;
+                            const data = await res.json();
+                            const songObj = (data.songs && data.songs[0]) || null;
+                            const pic = (songObj?.al?.picUrl || songObj?.album?.picUrl || '').replace(/^http:\/\//i, 'https://');
+                            if (pic) {
+                                track.cover = `${pic}?param=300y300`;
+                                const curTrack = this.playlistQueue[this.curTrackIdx];
+                                if (curTrack && curTrack.id === track.id) {
+                                    document.getElementById('cm-mini-disc').style.backgroundImage = `url('${track.cover}')`;
+                                    document.getElementById('cm-fp-bg-blur').style.backgroundImage = `url('${track.cover}')`;
+                                    document.getElementById('cm-fp-cover').style.backgroundImage = `url('${track.cover}')`;
+                                }
+                                break;
+                            }
+                        } catch (e) {}
+                    }
+                },
+
                 updatePlayerMetaUI: function(track) {
                     const defaultCover = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80';
-                    const coverUrl = track.cover || defaultCover;
+                    const coverUrl = track.cover || (track.songId ? `https://api.injahow.cn/meting/?type=pic&id=${track.songId}` : defaultCover);
 
                     document.getElementById('cm-mini-disc').style.backgroundImage = `url('${coverUrl}')`;
                     document.getElementById('cm-mini-title').innerText = `${track.title} - ${track.artist}`;
@@ -14233,6 +14288,11 @@ if (badgeEl) {
                     document.getElementById('cm-fp-cover').style.backgroundImage = `url('${coverUrl}')`;
                     document.getElementById('cm-fp-title').innerText = track.title;
                     document.getElementById('cm-fp-artist').innerText = track.artist;
+
+                    // 如果封面不是直接的 126.net 图床地址，后台静默补全高清专辑封面
+                    if (!track.isCharSong && track.songId && (!track.cover || !track.cover.includes('music.126.net'))) {
+                        this.fetchRealSongCover(track);
+                    }
 
                     const abBtn = document.getElementById('cm-fp-ab-switch');
                     if (abBtn) {
@@ -42041,24 +42101,49 @@ ${chronologicalContext || '日常生活状态。'}
                             <span>正在云端检索歌曲...</span>
                         </div>`;
 
-                    const endpoints = [
-                        `https://apis.netstart.cn/music/cloudsearch?keywords=${encodeURIComponent(kw)}&limit=100&offset=0&type=1`,
-                        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent('https://music.163.com/api/cloudsearch/pc?s=' + encodeURIComponent(kw) + '&type=1&offset=0&limit=100')}`,
-                        `https://apis.netstart.cn/music/search?keywords=${encodeURIComponent(kw)}&limit=100&offset=0&type=1`
-                    ];
+                    // 8条多源搜索通道备用（国内镜像 + 国际代理直连网易云官网 + Meting聚合源）
+        const neteasePcUrl = 'https://music.163.com/api/cloudsearch/pc?s=' + encodeURIComponent(kw) + '&type=1&offset=0&limit=100';
+        const neteaseWebUrl = 'https://music.163.com/api/search/get/web?s=' + encodeURIComponent(kw) + '&type=1&offset=0&total=true&limit=100';
+        const endpoints = [
+            `https://zm.armoe.cn/cloudsearch?keywords=${encodeURIComponent(kw)}&limit=100&offset=0&type=1`,
+            `https://ncm.zhenxin.me/cloudsearch?keywords=${encodeURIComponent(kw)}&limit=100&offset=0&type=1`,
+            `https://music-api.heheda.top/cloudsearch?keywords=${encodeURIComponent(kw)}&limit=100&offset=0&type=1`,
+            `https://corsproxy.io/?${encodeURIComponent(neteasePcUrl)}`,
+            `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(neteasePcUrl)}`,
+            `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(neteaseWebUrl)}`,
+            `https://api.injahow.cn/meting/?type=search&id=${encodeURIComponent(kw)}`,
+            `https://api.i-meto.com/meting/api?server=netease&type=search&id=${encodeURIComponent(kw)}`
+        ];
 
-                    let rawSongs = [];
-                    for (let api of endpoints) {
-                        try {
-                            const res = await fetch(api);
-                            if (!res.ok) continue;
-                            const data = await res.json();
-                            if (data?.result?.songs && data.result.songs.length > 0) {
-                                rawSongs = data.result.songs;
-                                break;
-                            }
-                        } catch (e) {}
-                    }
+        let rawSongs = [];
+        for (let api of endpoints) {
+            try {
+                const ctrl = new AbortController();
+                const timer = setTimeout(() => ctrl.abort(), 5000);
+                const res = await fetch(api, { signal: ctrl.signal });
+                clearTimeout(timer);
+                if (!res.ok) continue;
+                const data = await res.json();
+                if (data?.result?.songs && data.result.songs.length > 0) {
+                    rawSongs = data.result.songs;
+                    break;
+                } else if (Array.isArray(data) && data.length > 0) {
+                    rawSongs = data.map(item => {
+                        const sidMatch = String(item.url || item.id || '').match(/id=(\d+)/);
+                        const sid = sidMatch ? sidMatch[1] : String(item.id || Date.now());
+                        return {
+                            id: sid,
+                            name: item.name || item.title || '未知歌曲',
+                            ar: [{ name: item.artist || item.author || '未知歌手' }],
+                            al: { picUrl: item.pic || item.cover || '' },
+                            fee: 0,
+                            dt: 210000
+                        };
+                    });
+                    break;
+                }
+            } catch (e) {}
+        }
 
                     // 自动屏蔽纯VIP专享(fee===1)与付费专辑(fee===4)
                     rawSongs = rawSongs.filter(s => s.fee !== 1 && s.fee !== 4);
