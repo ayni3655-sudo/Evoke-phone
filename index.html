@@ -13275,12 +13275,13 @@ if (badgeEl) {
                     <div style="background:#ffffff; border-radius:18px; padding:16px; box-shadow:0 2px 10px rgba(0,0,0,0.03); display:flex; flex-direction:column; gap:14px;">
                         <div id="xj-pub-edit-mode-tip" style="display:none; font-size:11px; color:#ff9500; font-weight:600; text-align:right; cursor:pointer;" onclick="window.XianJiApp.resetPublishForm()">正在编辑已有商品 (点击取消编辑)</div>
 
-                        <!-- 选择商品 Emoji 图标 -->
+                        <!-- 选择商品 Emoji 图标 / 上传实拍图 / 智能匹配图 -->
                         <div>
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                                <span style="font-size:12.5px; font-weight:600; color:#555;">选择商品图标</span>
-                                <span id="xj-pub-selected-emoji-preview" style="font-size:24px; background:#fff9c4; padding:2px 10px; border-radius:8px; border:1px solid #ffda00;">👗</span>
+                                <span style="font-size:12.5px; font-weight:600; color:#555;">选择商品配图或图标</span>
+                                <span id="xj-pub-selected-emoji-preview" style="font-size:22px; min-height:32px; background:#fff9c4; padding:2px 10px; border-radius:8px; border:1px solid #ffda00; display:inline-flex; align-items:center; justify-content:center;">👗</span>
                             </div>
+                            <input type="file" id="xj-pub-upload-input" accept="image/*" style="display:none;" onchange="window.XianJiApp.handlePubImageUpload(event)">
                             <div class="xj-emoji-picker-grid" id="xj-pub-emoji-grid"></div>
                         </div>
 
@@ -13756,13 +13757,16 @@ if (badgeEl) {
                 reviewingOrderId: null,
                 selectedReviewTag: '好评 🌟',
                 selectedPubEmoji: '👗',
+                pubImgMode: 'emoji', // 'emoji' | 'upload' | 'auto_match'
+                pubUploadedBase64: '',
+                _imgBatchToken: 0,
                 selectedPubCondition: '全新',
                 isPubFreeShipping: true,
                 isSearchMode: false,
                 _tickTimer: null,
                 _isAlertLock: false,
 
-                // 涵盖全品类物品的 140 个精选商品图标（每排7个，共20整排，默认展示3排可上下拖动）
+                // 涵盖全品类物品的 140 个精选商品图标（每排7个，前两个位置固定为上传图片与智能匹配图）
                 emojiPool: [
                     // 服饰穿搭与鞋帽箱包
                     '👗','👚','👕','👔','🧥','🥼','👖','🩳','👙','👘',
@@ -13787,7 +13791,90 @@ if (badgeEl) {
                     '🚲','🛴','🏍️','⛺','🏕️','🎣','🤿','🎿','🏂','🏋️'
                 ],
 
-                 initData: function() {
+                // 根据商品名称生成免翻墙必应裁剪实拍图链接（零本地内存占用）
+                buildGoodImageUrl: function(titleStr, seedIdx = 0, w = 320, h = 280) {
+                    const clean = String(titleStr || '闲置好物')
+                        .replace(/#\d+/g, '')
+                        .replace(/\(\d+号闲置\)/g, '')
+                        .replace(/[·•｜|（）()【】\[\]]/g, ' ')
+                        .trim();
+                    const query = (clean || '闲置物品') + ' 实物 实拍 闲置';
+                    const hostNum = (Math.abs(seedIdx) % 4) + 1;
+                    return `https://tse${hostNum}-mm.cn.bing.net/th?q=${encodeURIComponent(query)}&w=${w}&h=${h}&c=7&rs=1&p=0`;
+                },
+
+                // 构建商品图片HTML（加载中保持空白不显示Emoji，加载成功平滑浮现，加载失败才显示Emoji兜底）
+                buildGoodVisualInnerHtml: function(good, emojiFontSize = 58, immediateLoad = false) {
+                    const em = good.emoji || '🛍️';
+                    const imgUrl = good.imageUrl || '';
+                    if (!imgUrl) {
+                        return `<span class="xj-fallback-emoji" style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:${emojiFontSize}px;">${em}</span>`;
+                    }
+                    if (immediateLoad) {
+                        return `
+                        <span class="xj-fallback-emoji" style="display:none;align-items:center;justify-content:center;width:100%;height:100%;font-size:${emojiFontSize}px;">${em}</span>
+                        <img src="${imgUrl}" decoding="async" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 0.2s ease;z-index:1;" onload="this.style.opacity='1';" onerror="this.style.display='none'; if(this.previousElementSibling) this.previousElementSibling.style.display='flex';">`;
+                    }
+                    return `
+                    <span class="xj-fallback-emoji" style="display:none;align-items:center;justify-content:center;width:100%;height:100%;font-size:${emojiFontSize}px;">${em}</span>
+                    <img data-xj-batch-src="${imgUrl}" decoding="async" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 0.2s ease;z-index:1;">`;
+                },
+
+                // 5个5个分批异步加载队列（哪怕用户还没滑到底部，也在后台分批静默加载完毕，绝不卡顿）
+                runBatchImageLoader: function(containerSelector, batchSize = 5) {
+                    const container = document.querySelector(containerSelector);
+                    if (!container) return;
+                    const imgs = Array.from(container.querySelectorAll('img[data-xj-batch-src]'));
+                    if (imgs.length === 0) return;
+
+                    const token = ++this._imgBatchToken;
+                    let currentIndex = 0;
+
+                    const loadNextBatch = () => {
+                        if (token !== this._imgBatchToken) return;
+                        const slice = imgs.slice(currentIndex, currentIndex + batchSize);
+                        if (slice.length === 0) return;
+                        currentIndex += batchSize;
+
+                        let settledCount = 0;
+                        let batchAdvanced = false;
+                        const proceed = () => {
+                            if (batchAdvanced || token !== this._imgBatchToken) return;
+                            batchAdvanced = true;
+                            setTimeout(loadNextBatch, 60);
+                        };
+
+                        slice.forEach(img => {
+                            const url = img.getAttribute('data-xj-batch-src');
+                            img.removeAttribute('data-xj-batch-src');
+                            if (!url) {
+                                settledCount++;
+                                if (settledCount >= slice.length) proceed();
+                                return;
+                            }
+                            img.onload = () => {
+                                img.style.opacity = '1';
+                                settledCount++;
+                                if (settledCount >= slice.length) proceed();
+                            };
+                            img.onerror = () => {
+                                img.style.display = 'none';
+                                const fallback = img.parentElement ? img.parentElement.querySelector('.xj-fallback-emoji') : null;
+                                if (fallback) fallback.style.display = 'flex';
+                                settledCount++;
+                                if (settledCount >= slice.length) proceed();
+                            };
+                            img.src = url;
+                        });
+
+                        // 单批最大等待900ms超时保护，防止某张慢图卡住后续批次
+                        setTimeout(proceed, 900);
+                    };
+
+                    loadNextBatch();
+                },
+
+                initData: function() {
                     if (!appData.xianji) {
                         appData.xianji = {
                             activeUserId: appData.settings.activeUserId || 'default',
@@ -13865,6 +13952,13 @@ if (badgeEl) {
                     // 若首次进入还没有推荐商品，生成初始 30 个本地精选与角色混合商品展示，点击右上角可随时调 API 刷新
                     if (!appData.xianji.recommendGoods || appData.xianji.recommendGoods.length === 0) {
                         this.seedInitialGoods();
+                    } else {
+                        // 为旧存档里还没有分配实拍图URL的推荐商品自动补齐图片链接
+                        (appData.xianji.recommendGoods || []).forEach((g, idx) => {
+                            if (!g.imageUrl && !g.isMine) {
+                                g.imageUrl = this.buildGoodImageUrl(g.title, idx);
+                            }
+                        });
                     }
                     this.renderHomeGoods();
                     this.updateUnreadBadge();
@@ -13922,7 +14016,6 @@ if (badgeEl) {
                         const c = (appData.charCards || []).find(x => x.id === sellerObj.charId);
                         if (c && (c.avatarThumb || c.avatar)) {
                             const thumbUrl = c.avatarThumb || c.avatar;
-                            // 若旧角色卡尚未生成裁剪缩略图，后台静默裁剪生成并缓存，避免下次读取原图卡顿
                             if (!c.avatarThumb && c.avatar && typeof generateThumbnail === 'function' && !c._generatingThumb) {
                                 c._generatingThumb = true;
                                 generateThumbnail(c.avatar, 96).then(resThumb => {
@@ -13984,7 +14077,7 @@ if (badgeEl) {
                 _islandQueue: [],
                 _islandShowing: false,
 
-                // 触发全局顶部灵动岛通知（支持在主屏幕及任何其他 APP 中跨应用弹出，点击可直达对应页面）
+                // 触发全局顶部灵动岛通知
                 triggerDynamicIsland: function(title, content, orderId = '') {
                     this._islandQueue.push({ title, content, orderId });
                     this._processIslandQueue();
@@ -14004,7 +14097,6 @@ if (badgeEl) {
                         return;
                     }
 
-                    // 设置灵动岛左侧图标：若在「外观」设置了闲集自定义图标则优先使用，否则显示闲集标志性黄黑购物袋图标
                     if (diAvatar) {
                         const customAppIcon = appData.beautify && appData.beautify.apps && appData.beautify.apps.xianji;
                         if (customAppIcon) {
@@ -14023,7 +14115,6 @@ if (badgeEl) {
                     diText.innerText = `【闲集】${item.title}：${item.content}`;
                     di.style.cursor = 'pointer';
 
-                    // 点击灵动岛可直接跳转到闲集对应页面（买家咨询跳消息页，物流/评价跳对应订单）
                     di.onclick = () => {
                         di.classList.remove('show', 'playing');
                         AppNav.goTo('page-xianji');
@@ -14052,7 +14143,7 @@ if (badgeEl) {
                     }, 3800);
                 },
 
-                // 添加交易消息提醒 (保持最新在最上方，满 20 条自动淘汰最旧的，并同步弹出全局灵动岛)
+                // 添加交易消息提醒
                 pushTradeNotice: function(title, content, orderId = '', showIsland = true) {
                     const prof = this.getCurrentProfile();
                     const now = new Date();
@@ -14088,7 +14179,7 @@ if (badgeEl) {
                     return conf;
                 },
 
-                // 强容错 JSON 解析器（防止生成30个商品长文本时出现格式瑕疵）
+                // 强容错 JSON 解析器
                 safeParseJson: function(raw) {
                     let txt = String(raw || '').replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
                     const firstBrace = txt.search(/[\{\[]/);
@@ -14096,10 +14187,8 @@ if (badgeEl) {
                     txt = txt.substring(firstBrace);
                     try { return JSON.parse(txt); } catch (e) {}
 
-                    // 修复末尾截断或多余逗号
                     let cleaned = txt.replace(/,\s*([\}\]])/g, '$1');
                     try { return JSON.parse(cleaned); } catch (e2) {
-                        // 自动补齐未闭合括号
                         let stack = [];
                         let inStr = false, esc = false;
                         for (let i = 0; i < cleaned.length; i++) {
@@ -14120,7 +14209,7 @@ if (badgeEl) {
                     }
                 },
 
-                 // 初始种子商品生成（包含勾选的角色与路人NPC共30个商品，随机穿插不置顶）
+                // 初始种子商品生成（自带根据标题匹配的实拍图链接 + Emoji兜底）
                 seedInitialGoods: function() {
                     const activeCharIds = (appData.xianji && appData.xianji.settings && appData.xianji.settings.activeCharIds) || [];
                     const chars = (appData.charCards || []).filter(c => !c.isNPC && activeCharIds.includes(c.id));
@@ -14136,15 +14225,17 @@ if (badgeEl) {
                     for (let i = 0; i < 30; i++) {
                         if (chars.length > 0 && i < 10) {
                             const ch = chars[i % chars.length];
+                            const gTitle = `${ch.name}闲置的复古随身好物`;
                             list.push({
                                 id: 'good_init_' + i + '_' + Date.now(),
-                                title: `${ch.name}闲置的私人物品 #${i + 1}`,
+                                title: gTitle,
                                 desc: `整理房间翻出来的闲置物品，平时保存得很妥当，没什么机会用到了，随缘挂在闲集上转手，认得我的直接私聊就行。`,
                                 price: 99 + (i * 20),
                                 origPrice: 299 + (i * 50),
                                 shippingFee: 0,
                                 condition: '几乎全新',
                                 emoji: this.emojiPool[i % this.emojiPool.length],
+                                imageUrl: this.buildGoodImageUrl(gTitle, i),
                                 wants: 3 + (i * 2),
                                 views: 45 + (i * 15),
                                 sellerName: ch.name,
@@ -14156,15 +14247,17 @@ if (badgeEl) {
                             });
                         } else {
                             const tpl = sampleNpcs[i % sampleNpcs.length];
+                            const fullTitle = tpl.title + (i >= 6 ? ` (${i+1}号闲置)` : '');
                             list.push({
                                 id: 'good_init_' + i + '_' + Date.now(),
-                                title: tpl.title + (i >= 6 ? ` (${i+1}号闲置)` : ''),
+                                title: fullTitle,
                                 desc: tpl.desc,
                                 price: tpl.price + (i % 7) * 5,
                                 origPrice: tpl.origPrice,
                                 shippingFee: i % 4 === 0 ? 10 : 0,
                                 condition: tpl.cond,
-                                emoji: this.emojiPool[(i * 3) % this.emojiPool.length],
+                                emoji: tpl.emoji || this.emojiPool[(i * 3) % this.emojiPool.length],
+                                imageUrl: this.buildGoodImageUrl(tpl.title, i),
                                 wants: 1 + (i % 18),
                                 views: 20 + (i * 12),
                                 sellerName: tpl.name + (i >= 6 ? i : ''),
@@ -14176,7 +14269,6 @@ if (badgeEl) {
                             });
                         }
                     }
-                    // 随机打乱，让角色商品与NPC商品自然穿插
                     for (let i = list.length - 1; i > 0; i--) {
                         const j = Math.floor(Math.random() * (i + 1));
                         const temp = list[i];
@@ -14187,7 +14279,7 @@ if (badgeEl) {
                     this.save();
                 },
 
-                // 渲染首页或搜索结果双列商品（过滤掉用户自己发布的商品）
+                // 渲染首页或搜索结果双列商品（启动 5个5个分批异步图片加载，加载中空白，失败才展示Emoji）
                 renderHomeGoods: function() {
                     const grid = document.getElementById('xj-home-goods-grid');
                     const statusBar = document.getElementById('xj-search-status-bar');
@@ -14203,14 +14295,18 @@ if (badgeEl) {
                     }
 
                     let html = '';
-                    goods.forEach(g => {
+                    goods.forEach((g, idx) => {
+                        if (!g.imageUrl && !g.isMine) {
+                            g.imageUrl = this.buildGoodImageUrl(g.title, idx);
+                        }
                         const avatarHtml = this.buildAvatarHtml(g, 18);
-                        const soldHtml = g.status !== 'on_sale' ? `<div class="xj-good-sold-mask">已卖出</div>` : '';
+                        const soldHtml = g.status !== 'on_sale' ? `<div class="xj-good-sold-mask" style="z-index:3;">已卖出</div>` : '';
+                        const visualHtml = this.buildGoodVisualInnerHtml(g, 58, false);
                         html += `
                         <div class="xj-good-card" onclick="window.XianJiApp.openGoodDetail('${g.id}')">
-                            <div class="xj-good-img-box">
-                                <span>${g.emoji || '🛍️'}</span>
-                                <span class="xj-good-cond-tag">${g.condition || '几乎全新'}</span>
+                            <div class="xj-good-img-box" style="overflow:hidden;">
+                                ${visualHtml}
+                                <span class="xj-good-cond-tag" style="z-index:2;">${g.condition || '几乎全新'}</span>
                                 ${soldHtml}
                             </div>
                             <div class="xj-good-info-box">
@@ -14227,6 +14323,8 @@ if (badgeEl) {
                         </div>`;
                     });
                     grid.innerHTML = html;
+                    // 启动 5个5个分批异步加载图片队列
+                    this.runBatchImageLoader('#xj-home-goods-grid', 5);
                     if (window.renderLazyAvatarBatch) {
                         window.renderLazyAvatarBatch('#xj-home-goods-grid', 'data-lazy-avatar', 10, 16);
                     }
@@ -14238,7 +14336,7 @@ if (badgeEl) {
                     this.renderHomeGoods();
                 },
 
-                // 点击右上角刷新或搜索框搜索：调用 API 一次性生成 30 个商品（含勾选角色的人设与记忆，且自然穿插）
+                // 点击右上角刷新或搜索框搜索：调用 API 一次性生成 30 个商品（自动生成对应实拍图链接 + Emoji兜底）
                 refreshHomeGoods: async function(searchKeyword = '') {
                     const isSearch = !!searchKeyword;
                     try {
@@ -14278,7 +14376,7 @@ ${charContextStr}` : `所有 30 个商品必须 100% 全部由不同路人 NPC �
 必须直接输出包含 30 个对象的纯 JSON 数组，严禁 markdown 代码块包裹，每个对象结构严格如下：
 [
   {
-    "title": "商品名称(10~22字)",
+    "title": "商品名称(10~22字，务必包含具体物品品类词以便配图)",
     "desc": "商品的详细描述，必须不少于25个字，符合卖家身份与说话习惯，包含成色、转手原因或细节",
     "price": 128,
     "origPrice": 399,
@@ -14315,26 +14413,29 @@ ${charContextStr}` : `所有 30 个商品必须 100% 全部由不同路人 NPC �
                         let arr = this.safeParseJson(rawReply);
                         if (!Array.isArray(arr)) arr = arr.goods || arr.items || [];
 
-                        const formatted = arr.slice(0, 30).map((it, idx) => ({
-                            id: (isSearch ? 'good_s_' : 'good_r_') + Date.now() + '_' + idx,
-                            title: it.title || '闲置好物',
-                            desc: (it.desc && it.desc.length >= 20) ? it.desc : ((it.desc || '个人闲置物品，保存状态非常好，功能一切正常，低价转给有需要的人。') + ' 诚心想要可以小刀，售出不退不换。'),
-                            price: parseFloat(it.price) || 99,
-                            origPrice: parseFloat(it.origPrice) || 299,
-                            shippingFee: parseFloat(it.shippingFee) || 0,
-                            condition: it.condition || '几乎全新',
-                            emoji: it.emoji || this.emojiPool[idx % this.emojiPool.length],
-                            wants: parseInt(it.wants) || Math.floor(Math.random() * 25 + 1),
-                            views: parseInt(it.views) || Math.floor(Math.random() * 300 + 30),
-                            sellerName: it.sellerName || '闲集玩家',
-                            isChar: isSearch ? false : !!it.isChar,
-                            charId: isSearch ? null : (it.charId || null),
-                            ipCity: it.ipCity || '广东·广州',
-                            lastActive: it.lastActive || '1小时前',
-                            status: 'on_sale'
-                        }));
+                        const formatted = arr.slice(0, 30).map((it, idx) => {
+                            const gTitle = it.title || '闲置好物';
+                            return {
+                                id: (isSearch ? 'good_s_' : 'good_r_') + Date.now() + '_' + idx,
+                                title: gTitle,
+                                desc: (it.desc && it.desc.length >= 20) ? it.desc : ((it.desc || '个人闲置物品，保存状态非常好，功能一切正常，低价转给有需要的人。') + ' 诚心想要可以小刀，售出不退不换。'),
+                                price: parseFloat(it.price) || 99,
+                                origPrice: parseFloat(it.origPrice) || 299,
+                                shippingFee: parseFloat(it.shippingFee) || 0,
+                                condition: it.condition || '几乎全新',
+                                emoji: it.emoji || this.emojiPool[idx % this.emojiPool.length],
+                                imageUrl: this.buildGoodImageUrl(gTitle, idx),
+                                wants: parseInt(it.wants) || Math.floor(Math.random() * 25 + 1),
+                                views: parseInt(it.views) || Math.floor(Math.random() * 300 + 30),
+                                sellerName: it.sellerName || '闲集玩家',
+                                isChar: isSearch ? false : !!it.isChar,
+                                charId: isSearch ? null : (it.charId || null),
+                                ipCity: it.ipCity || '广东·广州',
+                                lastActive: it.lastActive || '1小时前',
+                                status: 'on_sale'
+                            };
+                        });
 
-                        // 将生成的 30 个商品进行随机洗牌，确保角色发布的物品自然穿插在各个位置而不置顶
                         for (let i = formatted.length - 1; i > 0; i--) {
                             const j = Math.floor(Math.random() * (i + 1));
                             const temp = formatted[i];
@@ -14364,7 +14465,7 @@ ${charContextStr}` : `所有 30 个商品必须 100% 全部由不同路人 NPC �
                     this.refreshHomeGoods(kw);
                 },
 
-                // 查找任意商品对象 (推荐池、搜索池、或用户发布池)
+                // 查找任意商品对象
                 findGoodById: function(goodId) {
                     const prof = this.getCurrentProfile();
                     let found = (prof.publishedGoods || []).find(g => g.id === goodId);
@@ -14373,7 +14474,6 @@ ${charContextStr}` : `所有 30 个商品必须 100% 全部由不同路人 NPC �
                     if (found) return found;
                     found = (appData.xianji.searchGoods || []).find(g => g.id === goodId);
                     if (found) return found;
-                    // 遍历历史订单快照
                     const so = (prof.soldOrders || []).find(o => o.good && o.good.id === goodId);
                     if (so) return so.good;
                     const bo = (prof.boughtOrders || []).find(o => o.good && o.good.id === goodId);
@@ -14381,7 +14481,7 @@ ${charContextStr}` : `所有 30 个商品必须 100% 全部由不同路人 NPC �
                     return null;
                 },
 
-                // 打开商品全屏详情页
+                // 打开商品全屏详情页（支持展示实拍图或Emoji兜底）
                 openGoodDetail: function(goodId) {
                     const g = this.findGoodById(goodId);
                     if (!g) return;
@@ -14392,6 +14492,7 @@ ${charContextStr}` : `所有 30 个商品必须 100% 全部由不同路人 NPC �
                     const body = document.getElementById('xj-detail-body');
                     const bottomBar = document.getElementById('xj-detail-bottom-bar');
                     const avatarHtml = this.buildAvatarHtml(g, 42);
+                    const detailMainVisual = this.buildGoodVisualInnerHtml(g, 105, true);
 
                     body.innerHTML = `
                     <!-- 顶部卖家信息栏 -->
@@ -14412,7 +14513,7 @@ ${charContextStr}` : `所有 30 个商品必须 100% 全部由不同路人 NPC �
                         </div>
                     </div>
 
-                    <!-- 价格行（最右侧并排显示成色标签） + 第二行（包邮标签位于x人想要左边） -->
+                    <!-- 价格行 -->
                     <div style="margin-top:16px;">
                         <div style="display:flex; align-items:center; justify-content:space-between;">
                             <div style="display:flex; align-items:baseline; gap:8px;">
@@ -14431,13 +14532,12 @@ ${charContextStr}` : `所有 30 个商品必须 100% 全部由不同路人 NPC �
                     <div style="margin-top:14px; font-size:17px; font-weight:800; color:#111; line-height:1.4;">${g.title}</div>
                     <div style="margin-top:10px; font-size:14.5px; color:#2c2c2e; line-height:1.75; white-space:pre-wrap; text-align:justify;">${g.desc}</div>
 
-                    <!-- 大尺寸 Emoji 商品主图展示卡 -->
-                    <div style="margin-top:14px; width:100%; height:260px; border-radius:20px; background:#f8f9fa; border:0.5px solid #ececef; display:flex; flex-direction:column; align-items:center; justify-content:center; position:relative;">
-                        <div style="font-size:105px; filter:drop-shadow(0 8px 20px rgba(0,0,0,0.08));">${g.emoji || '🛍️'}</div>
-                        <div style="position:absolute; bottom:12px; right:14px; font-size:11px; color:#a1a1a6;">闲集实物拍摄 · 担保交易</div>
+                    <!-- 大尺寸商品主图展示卡（有图显示实拍大图，加载失败用Emoji兜底） -->
+                    <div style="margin-top:14px; width:100%; height:260px; border-radius:20px; background:#f8f9fa; border:0.5px solid #ececef; display:flex; flex-direction:column; align-items:center; justify-content:center; position:relative; overflow:hidden;">
+                        ${detailMainVisual}
+                        <div style="position:absolute; bottom:12px; right:14px; font-size:11px; color:#ffffff; background:rgba(0,0,0,0.45); backdrop-filter:blur(4px); padding:3px 8px; border-radius:6px; z-index:2;">闲集实物拍摄 · 担保交易</div>
                     </div>`;
 
-                    // 判断是否是当前用户自己发布的商品（自己的商品底部不显示聊一聊和立即购买）
                     if (g.isMine) {
                         bottomBar.innerHTML = `
                         <div style="font-size:12.5px; color:#8e8e93;">这是你发布的宝贝 (${g.status === 'on_sale' ? '在售中' : '已售出'})</div>
@@ -14505,7 +14605,7 @@ ${charContextStr}` : `所有 30 个商品必须 100% 全部由不同路人 NPC �
                     const box = document.getElementById('xj-buy-sheet-content');
                     box.innerHTML = `
                     <div style="display:flex; gap:12px; align-items:center; background:#f9f9fb; padding:10px; border-radius:14px; margin-bottom:14px;">
-                        <div style="font-size:38px; width:56px; height:56px; background:#fff; border-radius:10px; display:flex; align-items:center; justify-content:center;">${g.emoji}</div>
+                        <div style="font-size:32px; width:56px; height:56px; background:#fff; border-radius:10px; display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; flex-shrink:0;">${this.buildGoodVisualInnerHtml(g, 32, true)}</div>
                         <div style="flex:1; min-width:0;">
                             <div style="font-size:14px; font-weight:700; color:#111; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${g.title}</div>
                             <div style="font-size:12px; color:#8e8e93; margin-top:3px;">卖家: ${g.sellerName} (${g.ipCity || '外地'})</div>
@@ -14757,19 +14857,94 @@ return { title: '到达目的转运中心', detail: `快件已到达【${tc}中�
                     }
                 },
 
-                // ==================== 发布闲置与 3~8 个买家（含角色披马甲）上门咨询 ====================
+                 // ==================== 发布闲置与 3~8 个买家（含角色披马甲）上门咨询 ====================
                 renderEmojiGrid: function() {
                     const grid = document.getElementById('xj-pub-emoji-grid');
                     if (!grid) return;
-                    grid.innerHTML = this.emojiPool.map(em => `
-                        <div class="xj-emoji-Option ${em === this.selectedPubEmoji ? 'selected' : ''}" onclick="window.XianJiApp.selectPubEmoji('${em}')">${em}</div>
-                    `).join('');
+
+                    const isUploadSel = this.pubImgMode === 'upload';
+                    const isAutoSel = this.pubImgMode === 'auto_match';
+
+                    // 第1个图标：图标在上、文字在下（从相册上传实拍图）
+                    const uploadOptionHtml = `
+                        <div class="xj-emoji-Option ${isUploadSel ? 'selected' : ''}" onclick="window.XianJiApp.triggerPubUploadClick()" title="从相册上传实拍图(自动裁剪压缩)" style="background:${isUploadSel ? '#fff9c4' : '#f0f5ff'}; border-color:${isUploadSel ? '#111111' : '#cfe2ff'}; flex-direction:column; justify-content:center; align-items:center; gap:3px; padding:2px; overflow:hidden; box-sizing:border-box;">
+                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#0066ff" stroke-width="2.4" stroke-linecap="round" style="flex-shrink:0;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                            <span style="font-size:8.5px; font-weight:800; color:#0066ff; line-height:1; white-space:nowrap;">传图片</span>
+                        </div>`;
+
+                    // 第2个图标：横向占两格（grid-column: span 2），图标在上面、文字「根据名称自动配图」在下面，严格限制在框内
+                    const autoMatchOptionHtml = `
+                        <div class="xj-emoji-Option ${isAutoSel ? 'selected' : ''}" onclick="window.XianJiApp.selectPubAutoMatchMode()" title="根据商品名称自动匹配实拍图" style="grid-column: span 2; background:${isAutoSel ? '#fff9c4' : '#fdf2f8'}; border-color:${isAutoSel ? '#111111' : '#f9c6dd'}; flex-direction:column; justify-content:center; align-items:center; gap:3px; padding:2px 4px; overflow:hidden; box-sizing:border-box;">
+                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#db2777" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><rect x="3" y="3" width="18" height="18" rx="3"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><path d="M21 15l-5-5L5 21"></path></svg>
+                            <span style="font-size:8.5px; font-weight:800; color:#db2777; line-height:1; letter-spacing:-0.2px; white-space:nowrap; max-width:100%; overflow:hidden; text-overflow:ellipsis;">按名称自动配图</span>
+                        </div>`;
+
+                    const emojisHtml = this.emojiPool.map(em => {
+                        const isEmSel = (this.pubImgMode === 'emoji' && em === this.selectedPubEmoji);
+                        return `<div class="xj-emoji-Option ${isEmSel ? 'selected' : ''}" onclick="window.XianJiApp.selectPubEmoji('${em}')">${em}</div>`;
+                    }).join('');
+
+                    grid.innerHTML = uploadOptionHtml + autoMatchOptionHtml + emojisHtml;
+                    this.updatePubPreviewBadge();
+                },
+
+                updatePubPreviewBadge: function() {
+                    const prv = document.getElementById('xj-pub-selected-emoji-preview');
+                    if (!prv) return;
+                    if (this.pubImgMode === 'upload' && this.pubUploadedBase64) {
+                        prv.innerHTML = `<img src="${this.pubUploadedBase64}" style="width:28px;height:28px;border-radius:6px;object-fit:cover;display:block;">`;
+                    } else if (this.pubImgMode === 'auto_match') {
+                        prv.innerHTML = `<span style="font-size:11.5px;font-weight:800;color:#db2777;display:flex;align-items:center;gap:4px;"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.3"><rect x="3" y="3" width="18" height="18" rx="3"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><path d="M21 15l-5-5L5 21"></path></svg>按名称自动配图</span>`;
+                    } else {
+                        prv.innerText = this.selectedPubEmoji || '👗';
+                    }
+                },
+
+                triggerPubUploadClick: function() {
+                    const inp = document.getElementById('xj-pub-upload-input');
+                    if (inp) {
+                        inp.value = '';
+                        inp.click();
+                    }
+                },
+
+                // 处理相册选图并自动居中裁剪压缩为 320x320 小尺寸 JPEG（仅约15~25KB，绝不堵塞浏览器与IndexedDB）
+                handlePubImageUpload: function(event) {
+                    const file = event.target && event.target.files && event.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            const targetSize = 320;
+                            canvas.width = targetSize;
+                            canvas.height = targetSize;
+                            const ctx = canvas.getContext('2d');
+                            const minSide = Math.min(img.width, img.height);
+                            const sx = (img.width - minSide) / 2;
+                            const sy = (img.height - minSide) / 2;
+                            ctx.fillStyle = '#ffffff';
+                            ctx.fillRect(0, 0, targetSize, targetSize);
+                            ctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, targetSize, targetSize);
+                            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.78);
+                            this.pubUploadedBase64 = compressedDataUrl;
+                            this.pubImgMode = 'upload';
+                            this.renderEmojiGrid();
+                        };
+                        img.src = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                },
+
+                selectPubAutoMatchMode: function() {
+                    this.pubImgMode = 'auto_match';
+                    this.renderEmojiGrid();
                 },
 
                 selectPubEmoji: function(em) {
+                    this.pubImgMode = 'emoji';
                     this.selectedPubEmoji = em;
-                    const prv = document.getElementById('xj-pub-selected-emoji-preview');
-                    if (prv) prv.innerText = em;
                     this.renderEmojiGrid();
                 },
 
@@ -14794,6 +14969,8 @@ return { title: '到达目的转运中心', detail: `快件已到达【${tc}中�
 
                 resetPublishForm: function() {
                     this.editingGoodId = null;
+                    this.pubImgMode = 'emoji';
+                    this.pubUploadedBase64 = '';
                     document.getElementById('xj-pub-edit-mode-tip').style.display = 'none';
                     document.getElementById('xj-pub-title').value = '';
                     document.getElementById('xj-pub-desc').value = '';
@@ -14817,7 +14994,16 @@ return { title: '到达目的转运中心', detail: `快件已到达【${tc}中�
                     document.getElementById('xj-pub-desc').value = g.desc || '';
                     document.getElementById('xj-pub-price').value = g.price || '';
                     document.getElementById('xj-pub-orig-price').value = g.origPrice || '';
-                    this.selectPubEmoji(g.emoji || '👗');
+                    this.selectedPubEmoji = g.emoji || '👗';
+                    if (g.imageUrl && g.imageUrl.startsWith('data:image')) {
+                        this.pubImgMode = 'upload';
+                        this.pubUploadedBase64 = g.imageUrl;
+                    } else if (g.imageUrl) {
+                        this.pubImgMode = 'auto_match';
+                    } else {
+                        this.pubImgMode = 'emoji';
+                    }
+                    this.renderEmojiGrid();
                     this.selectPubCondition(g.condition || '几乎全新');
                     if (g.shippingFee > 0) {
                         this.setShippingType(false);
@@ -14838,6 +15024,14 @@ return { title: '到达目的转运中心', detail: `快件已到达【${tc}中�
                     if (!desc || desc.length < 10) return this.showAlert("描述太短啦", "请填写不少于 10 个字的商品详细描述，方便买家了解成色。");
                     if (isNaN(price) || price <= 0) return this.showAlert("价格无效", "请输入大于 0 的有效售价！");
 
+                    // 根据用户选择的图标模式决定商品实拍图链接
+                    let finalImageUrl = '';
+                    if (this.pubImgMode === 'upload' && this.pubUploadedBase64) {
+                        finalImageUrl = this.pubUploadedBase64;
+                    } else if (this.pubImgMode === 'auto_match') {
+                        finalImageUrl = this.buildGoodImageUrl(title, Date.now() % 4);
+                    }
+
                     const prof = this.getCurrentProfile();
                     const u = this.getCurrentUserObj();
                     const defaultAddr = (prof.addresses && prof.addresses[0]) ? prof.addresses[0].detail : '上海·浦东';
@@ -14852,6 +15046,7 @@ return { title: '到达目的转运中心', detail: `快件已到达【${tc}中�
                             exist.origPrice = origPrice;
                             exist.shippingFee = shipFee;
                             exist.emoji = this.selectedPubEmoji;
+                            exist.imageUrl = finalImageUrl;
                             exist.condition = this.selectedPubCondition;
                         }
                         this.save();
@@ -14870,6 +15065,7 @@ return { title: '到达目的转运中心', detail: `快件已到达【${tc}中�
                         shippingFee: shipFee,
                         condition: this.selectedPubCondition,
                         emoji: this.selectedPubEmoji,
+                        imageUrl: finalImageUrl,
                         wants: 0,
                         views: 1,
                         sellerName: u.name || 'User',
@@ -15120,13 +15316,12 @@ ${charPrompts || `共 ${buyerCount} 位性格各异的路人 NPC 买家（包含
                         return;
                     }
 
-                    // 每次渲染前严格按照最新消息时间倒序排列（最新的永远在最上方）
+                    // 每次渲染前严格按照最新消息时间倒序排列
                     chats.sort((a, b) => this.getChatSortTime(b) - this.getChatSortTime(a));
 
                     let html = '';
                     chats.forEach(c => {
                         const g = this.findGoodById(c.goodId) || { title: '闲置商品', emoji: '🛍️', price: 0 };
-                        // 注意：如果是用户去买角色的东西(role==='buyer')，角色显示真实头像；如果是别人来买用户的东西(role==='seller')，角色披马甲一律用首字头像
                         const avatarObj = (c.role === 'buyer' && c.isChar) ? { isChar: true, charId: c.charId, name: c.partnerName } : { isChar: false, name: c.partnerName };
                         const avHtml = this.buildAvatarHtml(avatarObj, 44);
                         const textMsgs = (c.messages || []).filter(m => m.type === 'text' || m.type === 'price_card' || m.type === 'paid_card' || m.type === 'shipped_card');
@@ -15149,12 +15344,14 @@ ${charPrompts || `共 ${buyerCount} 位性格各异的路人 NPC 买家（包含
                                 </div>
                                 <div style="font-size:12.5px; color:#666; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${lastPreview}</div>
                             </div>
-                            <div style="width:42px; height:42px; border-radius:8px; background:#f8f9fa; display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0; border:0.5px solid #ececef;">
-                                ${g.emoji || '🛍️'}
+                            <div style="width:44px; height:44px; border-radius:8px; background:#f8f9fa; display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0; border:0.5px solid #ececef; position:relative; overflow:hidden;">
+                                ${this.buildGoodVisualInnerHtml(g, 22, false)}
                             </div>
                         </div>`;
                     });
                     listEl.innerHTML = html;
+                    // 消息列表右侧商品小图同样 5个5个分批异步加载
+                    this.runBatchImageLoader('#xj-chat-session-list', 5);
                     if (window.renderLazyAvatarBatch) {
                         window.renderLazyAvatarBatch('#xj-chat-session-list', 'data-lazy-avatar', 10, 16);
                     }
@@ -15183,7 +15380,7 @@ ${charPrompts || `共 ${buyerCount} 位性格各异的路人 NPC 买家（包含
                             lastTime: this.formatTs(Date.now()),
                             lastTimestamp: Date.now(),
                             messages: [
-                                { type: 'good_card', goodId: g.id, price: g.price, title: g.title, emoji: g.emoji, time: this.formatTs(Date.now()) }
+                                { type: 'good_card', goodId: g.id, price: g.price, title: g.title, emoji: g.emoji, imageUrl: g.imageUrl || '', time: this.formatTs(Date.now()) }
                             ]
                         };
                         prof.chats.unshift(chat);
@@ -15210,7 +15407,7 @@ ${charPrompts || `共 ${buyerCount} 位性格各异的路人 NPC 买家（包含
                     const ipRegion = g.ipCity || (chat.partnerAddress ? this.parseChineseAddress(chat.partnerAddress).city : '未知地区');
                     document.getElementById('xj-chat-header-sub').innerText = chat.role === 'buyer' ? ipRegion : '买家咨询中';
 
-                    // 顶部商品状态横幅（卖家可点改价，买家可点立即购买）
+                    // 顶部商品状态横幅（支持显示商品实拍图）
                     const banner = document.getElementById('xj-chat-good-banner');
                     let actionBtnHtml = '';
                     if (g.status !== 'on_sale') {
@@ -15223,7 +15420,7 @@ ${charPrompts || `共 ${buyerCount} 位性格各异的路人 NPC 买家（包含
 
                     banner.innerHTML = `
                     <div onclick="window.XianJiApp.openGoodDetail('${g.id}')" style="display:flex; align-items:center; gap:10px; cursor:pointer; flex:1; min-width:0;">
-                        <div style="width:40px; height:40px; border-radius:8px; background:#f8f9fa; display:flex; align-items:center; justify-content:center; font-size:22px;">${g.emoji || '🛍️'}</div>
+                        <div style="width:42px; height:42px; border-radius:8px; background:#f8f9fa; display:flex; align-items:center; justify-content:center; font-size:22px; position:relative; overflow:hidden; flex-shrink:0; border:0.5px solid #ececef;">${this.buildGoodVisualInnerHtml(g, 22, true)}</div>
                         <div style="flex:1; min-width:0;">
                             <div style="font-size:13px; font-weight:700; color:#111; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${g.title}</div>
                             <div style="font-size:13.5px; font-weight:800; color:#ff3b30;">¥${parseFloat(g.price).toFixed(2)} <span style="font-size:10.5px; color:#8e8e93; font-weight:normal;">${g.shippingFee>0?('运费¥'+g.shippingFee):'包邮'}</span></div>
@@ -15231,7 +15428,6 @@ ${charPrompts || `共 ${buyerCount} 位性格各异的路人 NPC 买家（包含
                     </div>
                     <div>${actionBtnHtml}</div>`;
 
-                    // 先显示聊天页面容器，再渲染消息并直接定位到最末尾位置
                     const chatPage = document.getElementById('xj-subpage-chat');
                     chatPage.classList.add('show');
                     this.renderChatMessages(chat);
@@ -15250,13 +15446,15 @@ ${charPrompts || `共 ${buyerCount} 位性格各异的路人 NPC 买家（包含
                     const partnerAvObj = (chat.role === 'buyer' && chat.isChar) ? { isChar: true, charId: chat.charId, name: chat.partnerName } : { isChar: false, name: chat.partnerName };
                     const partnerAvHtml = this.buildAvatarHtml(partnerAvObj, 34);
                     const myAvHtml = this.buildAvatarHtml({ avatar: u.avatar, name: u.name }, 34);
+                    const linkedGood = this.findGoodById(chat.goodId);
 
                     let html = '';
                     (chat.messages || []).forEach(m => {
                         if (m.type === 'good_card') {
+                            const cardGoodObj = linkedGood || { emoji: m.emoji || '🛍️', imageUrl: m.imageUrl || '' };
                             html += `
                             <div onclick="window.XianJiApp.openGoodDetail('${m.goodId}')" style="align-self:center; width:94%; background:#ffffff; border-radius:16px; padding:12px 14px; border:0.5px solid rgba(0,0,0,0.06); display:flex; align-items:center; gap:12px; cursor:pointer; box-shadow:0 4px 16px rgba(0,0,0,0.03);">
-                                <div style="font-size:28px; width:46px; height:46px; border-radius:12px; background:#f5f5f7; display:flex; align-items:center; justify-content:center; flex-shrink:0;">${m.emoji || '🛍️'}</div>
+                                <div style="font-size:28px; width:48px; height:48px; border-radius:12px; background:#f5f5f7; display:flex; align-items:center; justify-content:center; flex-shrink:0; position:relative; overflow:hidden;">${this.buildGoodVisualInnerHtml(cardGoodObj, 26, true)}</div>
                                 <div style="flex:1; min-width:0;">
                                     <div style="font-size:13px; font-weight:700; color:#111; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${m.title}</div>
                                     <div style="font-size:14.5px; font-weight:800; color:#111; margin-top:4px; font-family:-apple-system, 'SF Pro Display', monospace;">¥${parseFloat(m.price).toFixed(2)}</div>
@@ -15305,7 +15503,6 @@ ${charPrompts || `共 ${buyerCount} 位性格各异的路人 NPC 买家（包含
                             </div>`;
                         } else {
                             const isMe = m.from === 'me';
-                            // 仅对对方发来的历史和新消息去除末尾句号，用户的发言完全保留不作修改
                             const displayText = isMe ? (m.text || '') : String(m.text || '').replace(/[。．.]+$/g, '').trim();
                             html += `
                             <div style="display:flex; gap:8px; align-items:flex-start; flex-direction:${isMe ? 'row-reverse' : 'row'};">
@@ -16099,7 +16296,7 @@ ${historyLines}
                             bodyEl.innerHTML = list.map(g => `
                                 <div onclick="window.XianJiApp.openGoodDetail('${g.id}')" style="background:#fff; border-radius:16px; padding:14px; display:flex; flex-direction:column; gap:10px; box-shadow:0 2px 8px rgba(0,0,0,0.02); cursor:pointer;">
                                     <div style="display:flex; gap:12px; align-items:center;">
-                                        <div style="width:60px; height:60px; border-radius:12px; background:#f8f9fa; display:flex; align-items:center; justify-content:center; font-size:32px; flex-shrink:0;">${g.emoji || '🛍️'}</div>
+                                        <div style="width:60px; height:60px; border-radius:12px; background:#f8f9fa; display:flex; align-items:center; justify-content:center; font-size:32px; flex-shrink:0; position:relative; overflow:hidden;">${this.buildGoodVisualInnerHtml(g, 30, false)}</div>
                                         <div style="flex:1; min-width:0;">
                                             <div style="font-size:14px; font-weight:700; color:#111; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${g.title}</div>
                                             <div style="font-size:15px; font-weight:800; color:#ff3b30; margin-top:4px;">¥${parseFloat(g.price).toFixed(2)}</div>
@@ -16134,7 +16331,7 @@ ${historyLines}
                                         <span style="font-size:11.5px; font-weight:700; color:#ff9500;">${statusTxt}</span>
                                     </div>
                                     <div style="display:flex; gap:12px; align-items:center;">
-                                        <div style="width:56px; height:56px; border-radius:10px; background:#f8f9fa; display:flex; align-items:center; justify-content:center; font-size:30px;">${o.good.emoji || '🛍️'}</div>
+                                        <div style="width:56px; height:56px; border-radius:10px; background:#f8f9fa; display:flex; align-items:center; justify-content:center; font-size:30px; position:relative; overflow:hidden; flex-shrink:0;">${this.buildGoodVisualInnerHtml(o.good, 28, false)}</div>
                                         <div style="flex:1; min-width:0;">
                                             <div style="font-size:13.5px; font-weight:700; color:#111; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${o.good.title}</div>
                                             <div style="font-size:14px; font-weight:800; color:#ff3b30; margin-top:4px;">实收 ¥${parseFloat(o.totalAmount).toFixed(2)}</div>
@@ -16174,7 +16371,7 @@ ${historyLines}
                                         <span style="font-size:11.5px; font-weight:700; color:#ff9500;">${statusTxt}</span>
                                     </div>
                                     <div style="display:flex; gap:12px; align-items:center;">
-                                        <div style="width:56px; height:56px; border-radius:10px; background:#f8f9fa; display:flex; align-items:center; justify-content:center; font-size:30px;">${o.good.emoji || '🛍️'}</div>
+                                        <div style="width:56px; height:56px; border-radius:10px; background:#f8f9fa; display:flex; align-items:center; justify-content:center; font-size:30px; position:relative; overflow:hidden; flex-shrink:0;">${this.buildGoodVisualInnerHtml(o.good, 28, false)}</div>
                                         <div style="flex:1; min-width:0;">
                                             <div style="font-size:13.5px; font-weight:700; color:#111; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${o.good.title}</div>
                                             <div style="font-size:14px; font-weight:800; color:#ff3b30; margin-top:4px;">实付 ¥${parseFloat(o.totalAmount).toFixed(2)}</div>
@@ -16199,6 +16396,7 @@ ${historyLines}
                     }
 
                     document.getElementById('xj-subpage-tradelist').classList.add('show');
+                    this.runBatchImageLoader('#xj-tradelist-body', 5);
                     if (window.renderLazyAvatarBatch) {
                         window.renderLazyAvatarBatch('#xj-tradelist-body', 'data-lazy-avatar', 10, 16);
                     }
@@ -18229,6 +18427,199 @@ ${historyLines}
                     </div>`;
                 },
 
+                 _wmImgBatchToken: 0,
+
+                // 根据外卖商品名称与店铺分类生成免翻墙必应实拍小图链接
+                buildFoodImageUrl: function(foodName, cats = ['food'], seedIdx = 0, size = 200) {
+                    const clean = String(foodName || '美食')
+                        .replace(/\(.*?\)|（.*?）|【.*?】/g, ' ')
+                        .replace(/\d+(?:个|只|粒|枚|串|斤|克|g|ml|瓶|袋|包|片|支|盒|贯|尾|寸)/gi, '')
+                        .trim();
+                    let suffix = '美食 实拍';
+                    if (Array.isArray(cats)) {
+                        if (cats.includes('dessert')) suffix = '饮品 甜品 实拍';
+                        else if (cats.includes('market')) suffix = '商品 实物 包装';
+                        else if (cats.includes('fresh')) suffix = '生鲜 果蔬 实拍';
+                        else if (cats.includes('flower')) suffix = '鲜花 礼盒 实拍';
+                        else if (cats.includes('digital')) suffix = '数码 配件 实物';
+                        else if (cats.includes('medicine')) suffix = '药品 药盒 实物';
+                    }
+                    const query = `${clean || foodName} ${suffix}`.trim();
+                    const hostNum = (Math.abs(seedIdx) % 4) + 1;
+                    return `https://tse${hostNum}-mm.cn.bing.net/th?q=${encodeURIComponent(query)}&w=${size}&h=${size}&c=7&rs=1&p=0`;
+                },
+
+                // 构建外卖商品图片框内容（加载过程中空白，绝不闪现Emoji；加载失败才显示Emoji兜底）
+                buildFoodVisualBoxHtml: function(foodObj, boxSize = 72, emojiSize = 36, radius = 12, immediate = false) {
+                    const em = foodObj.emoji || '🍱';
+                    const imgUrl = foodObj.imageUrl || '';
+                    if (!imgUrl) {
+                        return `<div style="width:${boxSize}px;height:${boxSize}px;border-radius:${radius}px;background:#f8f9fa;border:0.5px solid #ececef;display:flex;align-items:center;justify-content:center;font-size:${emojiSize}px;flex-shrink:0;">${em}</div>`;
+                    }
+                    if (immediate) {
+                        return `
+                        <div style="width:${boxSize}px;height:${boxSize}px;border-radius:${radius}px;background:#f8f9fa;border:0.5px solid #ececef;display:flex;align-items:center;justify-content:center;font-size:${emojiSize}px;flex-shrink:0;position:relative;overflow:hidden;">
+                            <span class="wm-fallback-emoji" style="display:none;align-items:center;justify-content:center;width:100%;height:100%;">${em}</span>
+                            <img src="${imgUrl}" decoding="async" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 0.2s ease;z-index:1;" onload="this.style.opacity='1';" onerror="this.style.display='none'; if(this.previousElementSibling) this.previousElementSibling.style.display='flex';">
+                        </div>`;
+                    }
+                    return `
+                    <div style="width:${boxSize}px;height:${boxSize}px;border-radius:${radius}px;background:#f8f9fa;border:0.5px solid #ececef;display:flex;align-items:center;justify-content:center;font-size:${emojiSize}px;flex-shrink:0;position:relative;overflow:hidden;">
+                        <span class="wm-fallback-emoji" style="display:none;align-items:center;justify-content:center;width:100%;height:100%;">${em}</span>
+                        <img data-wm-batch-src="${imgUrl}" decoding="async" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 0.2s ease;z-index:1;">
+                    </div>`;
+                },
+
+                // 通用容器 5个5个分批异步加载器（用于订单列表、搜索结果、结算页、订单详情页等，防止多单多图并发卡顿）
+                runContainerBatchLoader: function(containerSelector, batchSize = 5) {
+                    const container = document.querySelector(containerSelector);
+                    if (!container) return;
+                    const imgs = Array.from(container.querySelectorAll('img[data-wm-batch-src]'));
+                    if (imgs.length === 0) return;
+
+                    let curIdx = 0;
+                    const loadNext = () => {
+                        const slice = imgs.slice(curIdx, curIdx + batchSize);
+                        if (slice.length === 0) return;
+                        curIdx += batchSize;
+
+                        let settled = 0;
+                        let moved = false;
+                        const next = () => {
+                            if (moved) return;
+                            moved = true;
+                            setTimeout(loadNext, 60);
+                        };
+
+                        slice.forEach(img => {
+                            const url = img.getAttribute('data-wm-batch-src');
+                            img.removeAttribute('data-wm-batch-src');
+                            if (!url) {
+                                settled++;
+                                if (settled >= slice.length) next();
+                                return;
+                            }
+                            img.onload = () => {
+                                img.style.opacity = '1';
+                                settled++;
+                                if (settled >= slice.length) next();
+                            };
+                            img.onerror = () => {
+                                img.style.display = 'none';
+                                const fb = img.parentElement ? img.parentElement.querySelector('.wm-fallback-emoji') : null;
+                                if (fb) fb.style.display = 'flex';
+                                settled++;
+                                if (settled >= slice.length) next();
+                            };
+                            img.src = url;
+                        });
+                        setTimeout(next, 850);
+                    };
+
+                    loadNext();
+                },
+
+                // 点进店铺后：5个5个分批异步加载该店铺全部商品图片（当前分类优先，其余分类后台静默5个一批预载）
+                runStoreBatchImageLoader: function(store) {
+                    const token = ++this._wmImgBatchToken;
+                    const foodsEl = document.getElementById('wm-menu-foods');
+                    const domImgs = foodsEl ? Array.from(foodsEl.querySelectorAll('img[data-wm-batch-src]')) : [];
+
+                    // 收集当前店铺所有分类里的图片URL，确保切到别的分类时图片也已在后台按5个一批预载好
+                    const allUrls = [];
+                    const domUrlSet = new Set();
+                    domImgs.forEach(img => {
+                        const u = img.getAttribute('data-wm-batch-src');
+                        if (u) domUrlSet.add(u);
+                    });
+                    if (store && Array.isArray(store.menuCategories)) {
+                        store.menuCategories.forEach(cat => {
+                            (cat.foods || []).forEach(f => {
+                                if (!f.imageUrl) {
+                                    f.imageUrl = this.buildFoodImageUrl(f.name, store.cats, f.sales || 1);
+                                }
+                                if (f.imageUrl && !domUrlSet.has(f.imageUrl) && !allUrls.includes(f.imageUrl)) {
+                                    allUrls.push(f.imageUrl);
+                                }
+                            });
+                        });
+                    }
+
+                    let domIdx = 0;
+                    let bgIdx = 0;
+                    const batchSize = 5;
+
+                    const loadNextDomBatch = () => {
+                        if (token !== this._wmImgBatchToken) return;
+                        const slice = domImgs.slice(domIdx, domIdx + batchSize);
+                        if (slice.length === 0) {
+                            // 当前可见分类加载完后，继续5个5个在后台静默预载该店铺其余分类菜品
+                            loadNextBgBatch();
+                            return;
+                        }
+                        domIdx += batchSize;
+
+                        let settled = 0;
+                        let moved = false;
+                        const next = () => {
+                            if (moved || token !== this._wmImgBatchToken) return;
+                            moved = true;
+                            setTimeout(loadNextDomBatch, 55);
+                        };
+
+                        slice.forEach(img => {
+                            const url = img.getAttribute('data-wm-batch-src');
+                            img.removeAttribute('data-wm-batch-src');
+                            if (!url) {
+                                settled++;
+                                if (settled >= slice.length) next();
+                                return;
+                            }
+                            img.onload = () => {
+                                img.style.opacity = '1';
+                                settled++;
+                                if (settled >= slice.length) next();
+                            };
+                            img.onerror = () => {
+                                img.style.display = 'none';
+                                const fb = img.parentElement ? img.parentElement.querySelector('.wm-fallback-emoji') : null;
+                                if (fb) fb.style.display = 'flex';
+                                settled++;
+                                if (settled >= slice.length) next();
+                            };
+                            img.src = url;
+                        });
+                        setTimeout(next, 850);
+                    };
+
+                    const loadNextBgBatch = () => {
+                        if (token !== this._wmImgBatchToken) return;
+                        const bgSlice = allUrls.slice(bgIdx, bgIdx + batchSize);
+                        if (bgSlice.length === 0) return;
+                        bgIdx += batchSize;
+
+                        let settled = 0;
+                        let moved = false;
+                        const nextBg = () => {
+                            if (moved || token !== this._wmImgBatchToken) return;
+                            moved = true;
+                            setTimeout(loadNextBgBatch, 80);
+                        };
+
+                        bgSlice.forEach(u => {
+                            const probe = new Image();
+                            probe.onload = probe.onerror = () => {
+                                settled++;
+                                if (settled >= bgSlice.length) nextBg();
+                            };
+                            probe.src = u;
+                        });
+                        setTimeout(nextBg, 900);
+                    };
+
+                    loadNextDomBatch();
+                },
+
                 buildUserCircleAvatar: function(name, size = 30) {
                     const first = String(name || '食').trim().charAt(0) || '食';
                     const bg = this.getStoreLogoColor(name);
@@ -18237,7 +18628,6 @@ ${historyLines}
 
                 // 辅助生成完整的店铺菜单（包含推荐分类 + 4个特色分类 = 5个分类，每个分类至少5个商品）与至少5条评价
                 createStoreEntity: function(cfg) {
-                    // cfg.rawCats: [ { catName: '招牌菜', items: [ [name, emoji, price, specType, desc], ... ] } ]
                     let menuCategories = [];
                     let allFoodsFlat = [];
 
@@ -18255,8 +18645,9 @@ ${historyLines}
                                 id: `${cfg.id}_f_${cIdx}_${fIdx}`,
                                 name: it[0],
                                 emoji: it[1],
+                                imageUrl: this.buildFoodImageUrl(it[0], cats, cIdx * 10 + fIdx),
                                 price: it[2],
-                                specType: it[3] || 'none', // 'none' | 'dish' | 'spicy_dish' | 'drink' | 'west'
+                                specType: it[3] || 'none',
                                 desc: it[4] || defaultItemDesc,
                                 sales: Math.floor(200 + Math.random() * 1600)
                             };
@@ -18739,13 +19130,15 @@ ${historyLines}
                             const promosHtml = (st.promoTags || []).map(p => `<span class="wm-promo-tag" style="flex-shrink:0;">${p}</span>`).join('');
 
                             const topFoods = (st.menuCategories && st.menuCategories[0] && st.menuCategories[0].foods) ? st.menuCategories[0].foods.slice(0, 3) : [];
-                            const foodPrvHtml = topFoods.map(f => `
+                            const foodPrvHtml = topFoods.map((f, fIdx) => {
+                                if (!f.imageUrl) f.imageUrl = this.buildFoodImageUrl(f.name, st.cats, fIdx);
+                                return `
                                 <div style="flex:1; min-width:0; background:#f8f9fa; border-radius:10px; padding:8px; display:flex; flex-direction:column; align-items:center; text-align:center;">
-                                    <div style="font-size:28px; margin-bottom:4px;">${f.emoji || '🍱'}</div>
+                                    <div style="margin-bottom:5px;">${this.buildFoodVisualBoxHtml(f, 52, 26, 10, false)}</div>
                                     <div style="font-size:11.5px; font-weight:700; color:#111; width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${f.name}</div>
                                     <div style="font-size:12.5px; font-weight:800; color:#ff3b30; margin-top:2px;">¥${f.price}</div>
-                                </div>
-                            `).join('');
+                                </div>`;
+                            }).join('');
 
                             return `
                             <div onclick="window.WaimaiApp.openStoreDetail('${st.id}')" style="background:#ffffff; border-radius:14px; padding:12px; display:flex; flex-direction:column; gap:12px; box-shadow:0 2px 10px rgba(0,0,0,0.025); cursor:pointer;">
@@ -18773,6 +19166,7 @@ ${historyLines}
                                 ${foodPrvHtml ? `<div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; padding-top:2px; border-top:0.5px dashed #f0f0f2;">${foodPrvHtml}</div>` : ''}
                             </div>`;
                         }).join('');
+                        this.runContainerBatchLoader('#wm-home-store-list', 5);
                         return;
                     }
 
@@ -19437,7 +19831,10 @@ ${historyLines}
 
                     const storeCart = this.cart[st.id] || [];
 
-                    foodsEl.innerHTML = curCat.foods.map(f => {
+                    foodsEl.innerHTML = curCat.foods.map((f, fIdx) => {
+                        if (!f.imageUrl) {
+                            f.imageUrl = this.buildFoodImageUrl(f.name, st.cats, fIdx);
+                        }
                         const hasSpec = f.specType && f.specType !== 'none';
                         const inCartQty = storeCart.filter(it => it.foodId === f.id).reduce((s, it) => s + it.qty, 0);
 
@@ -19458,7 +19855,7 @@ ${historyLines}
 
                         return `
                         <div class="wm-food-item">
-                            <div class="wm-food-emoji-box">${f.emoji || '🍱'}</div>
+                            ${this.buildFoodVisualBoxHtml(f, 72, 36, 12, false)}
                             <div class="wm-food-info">
                                 <div class="wm-food-name">${f.name}</div>
                                 <div class="wm-food-desc">${f.desc || '精选新鲜食材'}</div>
@@ -19470,6 +19867,9 @@ ${historyLines}
                             </div>
                         </div>`;
                     }).join('');
+
+                    // 点进店铺或切换分类时，启动 5个5个分批异步图片加载队列
+                    this.runStoreBatchImageLoader(st);
                 },
 
                 selectStoreCat: function(idx) {
@@ -19518,7 +19918,7 @@ ${historyLines}
                     return null;
                 },
 
-                // 直接加购无需选规格的商品（如米饭、日用品等）
+                // 直接加购无需选规格的商品
                 directAddFood: function(foodId) {
                     const st = this.findStoreById(this.activeStoreId);
                     const food = this.findFoodInStore(st, foodId);
@@ -19528,12 +19928,13 @@ ${historyLines}
                         foodId: food.id,
                         name: food.name,
                         emoji: food.emoji || '🍱',
+                        imageUrl: food.imageUrl || '',
                         unitPrice: parseFloat(food.price),
                         specText: '标准规格'
                     });
                 },
 
-                // 打开选规格中央弹窗（根据商品类型动态生成辣度/份量/杯型/温度/糖度/小料，并实时变动价格）
+                // 打开选规格中央弹窗
                 openSpecModal: function(foodId) {
                     const st = this.findStoreById(this.activeStoreId);
                     const food = this.findFoodInStore(st, foodId);
@@ -19626,6 +20027,7 @@ ${historyLines}
                         foodId: s.food.id,
                         name: s.food.name,
                         emoji: s.food.emoji || '🍱',
+                        imageUrl: s.food.imageUrl || '',
                         unitPrice: s.calculatedPrice,
                         specText: s.calculatedSpecText
                     });
@@ -19724,7 +20126,7 @@ ${historyLines}
                     box.innerHTML = list.map(it => `
                         <div style="display:flex; justify-content:space-between; align-items:center; padding-bottom:10px; border-bottom:0.5px dashed #f0f0f2;">
                             <div style="display:flex; align-items:center; gap:10px; min-width:0;">
-                                <span style="font-size:26px;">${it.emoji}</span>
+                                ${this.buildFoodVisualBoxHtml(it, 44, 24, 8, true)}
                                 <div style="min-width:0;">
                                     <div style="font-size:13.5px; font-weight:800; color:#111;">${it.name}</div>
                                     <div style="font-size:11px; color:#8e8e93;">${it.specText}</div>
@@ -19785,7 +20187,6 @@ ${historyLines}
                     const delivFee = parseFloat(st.deliveryFee) || 0;
                     const rawTotal = foodsPrice + packFee + delivFee;
 
-                    // 解析店铺满减规则（支持 25减6、满50减12、满30元减5元 等格式），筛选当前金额能达到的最大满减
                     const baseItemPrice = foodsPrice + packFee;
                     let bestStoreDiscount = 0;
                     let matchedPromoRuleText = '';
@@ -19842,13 +20243,13 @@ ${historyLines}
                         </div>
                     </div>
 
-                    <!-- 店铺商品与费用明细卡 -->
+                    <!-- 店铺商品与费用明细卡（显示商品实拍图） -->
                     <div style="background:#fff; border-radius:16px; padding:14px; display:flex; flex-direction:column; gap:10px;">
                         <div style="font-size:14px; font-weight:800; color:#111; padding-bottom:8px; border-bottom:0.5px solid #f0f0f2;">${st.name}</div>
                         ${list.map(it => `
                             <div style="display:flex; justify-content:space-between; align-items:center;">
                                 <div style="display:flex; align-items:center; gap:10px;">
-                                    <span style="font-size:26px;">${it.emoji}</span>
+                                    ${this.buildFoodVisualBoxHtml(it, 46, 24, 9, true)}
                                     <div>
                                         <div style="font-size:13.5px; font-weight:700; color:#111;">${it.name}</div>
                                         <div style="font-size:11px; color:#8e8e8e;">${it.specText} · x${it.qty}</div>
@@ -19873,7 +20274,7 @@ ${historyLines}
                         </div>
                     </div>
 
-                    <!-- 订单备注卡 (严格使用 textarea) -->
+                    <!-- 订单备注卡 -->
                     <div style="background:#fff; border-radius:16px; padding:14px;">
                         <div style="font-size:13px; font-weight:800; color:#111; margin-bottom:6px;">订单备注</div>
                         <textarea id="wm-checkout-remark" class="wm-textarea-multi" style="min-height:60px;" placeholder="可填写口味偏好、放门口、或给收餐人的留言...">${savedRemark}</textarea>
@@ -20453,12 +20854,17 @@ ${historyLines}
                         const isDone = ord.stageIndex >= 6;
                         const statusColor = isUnpaid ? '#ff3b30' : (isDone ? '#666' : '#ff6b00');
 
-                        const itemsPrv = (ord.items || []).map(it => `
-                            <div style="display:flex; justify-content:space-between; align-items:center; font-size:12.5px; color:#444; padding:3px 0;">
-                                <span>${it.emoji} ${it.name} <span style="color:#8e8e93; font-size:11px;">(${it.specText})</span></span>
-                                <span>x${it.qty}</span>
-                            </div>
-                        `).join('');
+                        const itemsPrv = (ord.items || []).map((it, idx) => {
+                            if (!it.imageUrl) it.imageUrl = this.buildFoodImageUrl(it.name, ['food'], idx);
+                            return `
+                            <div style="display:flex; justify-content:space-between; align-items:center; font-size:12.5px; color:#444; padding:4px 0;">
+                                <div style="display:flex; align-items:center; gap:8px; min-width:0;">
+                                    ${this.buildFoodVisualBoxHtml(it, 34, 18, 6, false)}
+                                    <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${it.name} <span style="color:#8e8e93; font-size:11px;">(${it.specText})</span></span>
+                                </div>
+                                <span style="flex-shrink:0; margin-left:8px;">x${it.qty}</span>
+                            </div>`;
+                        }).join('');
 
                         return `
                         <div onclick="window.WaimaiApp.openOrderTrackPage('${ord.id}')" style="background:#ffffff; border-radius:16px; padding:14px; display:flex; flex-direction:column; gap:10px; box-shadow:0 2px 10px rgba(0,0,0,0.025); cursor:pointer; ${isUnpaid ? 'border:1px solid rgba(255,59,48,0.28);' : ''}">
@@ -20500,6 +20906,9 @@ ${historyLines}
                             </div>
                         </div>`;
                     }).join('');
+
+                    // 订单列表中的商品缩略图按 5个5个分批异步加载，哪怕积攒上百单也丝滑不卡
+                    this.runContainerBatchLoader('#wm-orders-list-ctn', 5);
                 },
 
                 openOrderTrackPage: function(orderId, fromWeChat = null) {
@@ -20565,21 +20974,23 @@ ${historyLines}
                         </div>` : ''}
                     </div>
 
-                    <!-- 餐品明细与价格账单 -->
+                    <!-- 餐品明细与价格账单（5个5个分批异步加载商品实拍图） -->
                     <div style="background:#fff; border-radius:16px; padding:14px; display:flex; flex-direction:column; gap:10px;">
                         <div onclick="window.WaimaiApp.openStoreDetail('${ord.storeId}')" style="font-size:14.5px; font-weight:800; color:#111; border-bottom:0.5px solid #f0f0f2; padding-bottom:8px; cursor:pointer;">${ord.storeName} ›</div>
-                        ${(ord.items || []).map(it => `
+                        ${(ord.items || []).map((it, idx) => {
+                            if (!it.imageUrl) it.imageUrl = this.buildFoodImageUrl(it.name, ['food'], idx);
+                            return `
                             <div style="display:flex; justify-content:space-between; align-items:center;">
                                 <div style="display:flex; align-items:center; gap:10px;">
-                                    <span style="font-size:24px;">${it.emoji}</span>
+                                    ${this.buildFoodVisualBoxHtml(it, 44, 22, 9, false)}
                                     <div>
                                         <div style="font-size:13.5px; font-weight:700; color:#111;">${it.name}</div>
                                         <div style="font-size:11px; color:#8e8e93;">${it.specText} · x${it.qty}</div>
                                     </div>
                                 </div>
                                 <span style="font-size:13.5px; font-weight:800; color:#111; font-family:monospace;">¥${(it.unitPrice * it.qty).toFixed(2)}</span>
-                            </div>
-                        `).join('')}
+                            </div>`;
+                        }).join('')}
                         <div style="border-top:0.5px dashed #ececef; padding-top:8px; font-size:12px; color:#666; display:flex; flex-direction:column; gap:5px;">
                             <div style="display:flex; justify-content:space-between;"><span>打包费</span><span>¥${parseFloat(ord.packFee||0).toFixed(2)}</span></div>
                             <div style="display:flex; justify-content:space-between;"><span>配送费</span><span>¥${parseFloat(ord.delivFee||0).toFixed(2)}</span></div>
@@ -20614,6 +21025,7 @@ ${historyLines}
                     </div>`;
 
                     document.getElementById('wm-subpage-order-track').classList.add('show');
+                    this.runContainerBatchLoader('#wm-track-body', 5);
                 },
 
                 closeOrderTrackPage: function() {
@@ -21998,12 +22410,16 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
             }
             .trv-rec-img-box {
                 width: 100%;
-                flex: 1.35;
-                min-height: 110px;
-                background-color: #dbeafe;
-                background-size: cover;
-                background-position: center;
+                height: 120px;
+                min-height: 120px;
+                max-height: 120px;
+                flex-shrink: 0;
+                background: linear-gradient(135deg, #e0f2fe 0%, #dbeafe 100%);
                 position: relative;
+                overflow: hidden;
+                display: flex;
+                align-items: center;
+                justify-content: center;
             }
             .trv-rec-city-tag {
                 position: absolute;
@@ -22994,18 +23410,37 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
                         'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=700&q=80',
                         'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=700&q=80',
                         'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=700&q=80',
-                        'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?auto=format&fit=crop&w=700&q=80'
+                        'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?auto=format&fit=crop&w=700&q=80',
+                        'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?auto=format&fit=crop&w=700&q=80',
+                        'https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=700&q=80',
+                        'https://images.unsplash.com/photo-1445019980597-93fa8acb246c?auto=format&fit=crop&w=700&q=80',
+                        'https://images.unsplash.com/photo-1564501049412-61c2a3083791?auto=format&fit=crop&w=700&q=80',
+                        'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=700&q=80',
+                        'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?auto=format&fit=crop&w=700&q=80'
                     ],
                     scenic: [
                         'https://images.unsplash.com/photo-1508804185872-d7badad00f7d?auto=format&fit=crop&w=700&q=80',
                         'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=700&q=80',
                         'https://images.unsplash.com/photo-1598970434795-0c54fe7c0648?auto=format&fit=crop&w=700&q=80',
-                        'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=700&q=80'
+                        'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=700&q=80',
+                        'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=700&q=80',
+                        'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=700&q=80',
+                        'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=700&q=80',
+                        'https://images.unsplash.com/photo-1516483638261-f4dbaf036963?auto=format&fit=crop&w=700&q=80',
+                        'https://images.unsplash.com/photo-1533105079780-92b9be482077?auto=format&fit=crop&w=700&q=80',
+                        'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=700&q=80'
                     ],
                     tour: [
                         'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?auto=format&fit=crop&w=700&q=80',
                         'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=700&q=80',
-                        'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=700&q=80'
+                        'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=700&q=80',
+                        'https://images.unsplash.com/photo-1530789253388-582c481c54b0?auto=format&fit=crop&w=700&q=80',
+                        'https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&w=700&q=80',
+                        'https://images.unsplash.com/photo-1527631746610-bca00a040d60?auto=format&fit=crop&w=700&q=80',
+                        'https://images.unsplash.com/photo-1504150558240-0b4fd8946624?auto=format&fit=crop&w=700&q=80',
+                        'https://images.unsplash.com/photo-1519046904884-53103b34b206?auto=format&fit=crop&w=700&q=80',
+                        'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=700&q=80',
+                        'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=700&q=80'
                     ]
                 },
 
@@ -23085,22 +23520,26 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
                     const defaultUrl = fallbackArr[indexSeed % fallbackArr.length];
                     if (!queryStr) return defaultUrl;
 
-                    try {
-                        const apiUrl = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(queryStr + ' photography')}&gsrnamespace=6&gsrlimit=6&prop=imageinfo&iiprop=url&iiurlwidth=640&format=json&origin=*`;
-                        const res = await fetch(apiUrl);
-                        if (res.ok) {
-                            const data = await res.json();
-                            if (data && data.query && data.query.pages) {
-                                const pages = Object.values(data.query.pages);
-                                for (let p of pages) {
-                                    const thumb = p.imageinfo && p.imageinfo[0] && (p.imageinfo[0].thumburl || p.imageinfo[0].url);
-                                    if (thumb && /\.(jpg|jpeg|png|webp)$/i.test(thumb)) {
-                                        return thumb;
-                                    }
-                                }
-                            }
-                        }
-                    } catch (e) {}
+                    const catSuffix = category === 'hotel' ? ' 酒店 建筑 实景' : ' 风景 旅游 实景';
+                    const cleanQuery = String(queryStr).replace(/[·•｜|（）()【】\[\]]/g, ' ').trim() + catSuffix;
+                    const hostNum = (indexSeed % 4) + 1;
+                    const bingDirectUrl = `https://tse${hostNum}-mm.cn.bing.net/th?q=${encodeURIComponent(cleanQuery)}&w=720&h=500&c=7&rs=1&p=0`;
+
+                    const isLoadable = await new Promise((resolve) => {
+                        const probeImg = new Image();
+                        const timer = setTimeout(() => resolve(false), 3500);
+                        probeImg.onload = () => {
+                            clearTimeout(timer);
+                            resolve(probeImg.naturalWidth > 10);
+                        };
+                        probeImg.onerror = () => {
+                            clearTimeout(timer);
+                            resolve(false);
+                        };
+                        probeImg.src = bingDirectUrl;
+                    });
+
+                    if (isLoadable) return bingDirectUrl;
                     return defaultUrl;
                 },
 
@@ -23217,7 +23656,7 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
                     return userObj.avatar;
                 },
 
-                // 列表左侧缩略图（去掉上面的两个大字，纯享实景图或精致矢量图标）
+                // 列表左侧缩略图（去掉上面的两个大字，图片未加载出来时仅图片区域显示柔和渐变占位，不影响文字）
                 buildListThumbHtml: function(title, imageUrl = '', width = 82, height = 104) {
                     const clean = String(title || '旅行');
                     const palettes = [
@@ -23230,12 +23669,10 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
                     let hash = 0;
                     for (let i = 0; i < clean.length; i++) hash = clean.charCodeAt(i) + ((hash << 5) - hash);
                     const bg = palettes[Math.abs(hash) % palettes.length];
-                    if (imageUrl) {
-                        return `<div class="trv-thumb-box" style="width:${width}px; height:${height}px; background-image:url('${imageUrl}');"></div>`;
-                    }
                     return `
                     <div class="trv-thumb-box" style="width:${width}px; height:${height}px; background:${bg};">
                         <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="1.8"><path d="m8 3 4 8 5-5 5 15H2L8 3z"></path><circle cx="17" cy="5" r="2"></circle></svg>
+                        ${imageUrl ? `<img src="${imageUrl}" style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block;" onerror="this.style.display='none'">` : ''}
                     </div>`;
                 },
 
@@ -23306,15 +23743,17 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
                     if (!ctn) return;
                     ctn.innerHTML = this.builtinScenicSpots.map((spot, idx) => `
                         <div class="trv-rec-card" onclick="window.TravelApp.openBuiltinScenicDetail(${idx})">
-                            <div class="trv-rec-img-box" style="background-image:url('${spot.imageUrl}');">
-                                <span class="trv-rec-city-tag">${spot.city}</span>
-                                <span class="trv-rec-price-badge">¥${spot.price}起</span>
+                            <div class="trv-rec-img-box">
+                                <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="#93c5fd" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                                ${spot.imageUrl ? `<img src="${spot.imageUrl}" style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:1; display:block;" onerror="this.style.display='none'">` : ''}
+                                <span class="trv-rec-city-tag" style="z-index:2;">${spot.city}</span>
+                                <span class="trv-rec-price-badge" style="z-index:2;">¥${spot.price}起</span>
                             </div>
-                            <div style="padding:11px 14px 16px 14px; display:flex; flex-direction:column; justify-content:space-between; flex:1; min-height:0; box-sizing:border-box;">
+                            <div style="padding:11px 14px 14px 14px; display:flex; flex-direction:column; justify-content:space-between; flex:1; min-height:0; background:#ffffff; z-index:3; box-sizing:border-box;">
                                 <div>
                                     <div style="font-size:14.5px; font-weight:900; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.25;">${spot.name}</div>
-                                    <div style="font-size:11.5px; color:#0066ff; font-weight:700; margin-top:5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.3;">${spot.slogan}</div>
-                                    <div style="font-size:11px; color:#64748b; margin-top:5px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; line-height:1.48;">${spot.intro}</div>
+                                    <div style="font-size:11.5px; color:#0066ff; font-weight:700; margin-top:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.3;">${spot.slogan}</div>
+                                    <div style="font-size:11px; color:#64748b; margin-top:4px; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; line-height:1.42;">${spot.intro}</div>
                                 </div>
                                 <div style="display:flex; align-items:center; justify-content:space-between; padding-top:9px; margin-bottom:2px; border-top:0.5px solid #f1f5f9; font-size:11px; color:#64748b;">
                                     <span style="color:#f59e0b; font-weight:800;">★ ${spot.score || '4.9'}分</span>
@@ -23575,7 +24014,7 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
                     }
                 },
 
-                // ==================== 机票算法推导与按价格从低到高排序列表 ====================
+                // ==================== 机票算法推导与按价格从低到高排序列表（当天自动过滤早于当前时间的班次） ====================
                 renderFlightListPage: function(fromCity, toCity, dateStr, cabinType) {
                     this.currentListMode = 'flight';
                     const isFirst = cabinType.includes('头等');
@@ -23584,14 +24023,51 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
                     for (let i = 0; i < seedStr.length; i++) hash = seedStr.charCodeAt(i) + ((hash << 5) - hash);
                     const baseDistPrice = 420 + (Math.abs(hash) % 680);
 
-                    const airlines = [
+                    const rawAirlines = [
                         { code: 'MU5108', name: '东方航空', plane: '空客A320', depH: 8, depM: 15, durMins: 135, factor: 0.85, rate: '98%' },
                         { code: 'CA1832', name: '中国国航', plane: '波音737-800', depH: 10, depM: 40, durMins: 140, factor: 1.0, rate: '99%' },
                         { code: 'CZ3905', name: '南方航空', plane: '空客A321', depH: 13, depM: 20, durMins: 130, factor: 0.78, rate: '96%' },
                         { code: 'HO1256', name: '吉祥航空', plane: '波音787宽体机', depH: 16, depM: 10, durMins: 145, factor: 0.92, rate: '97%' },
                         { code: 'HU7609', name: '海南航空', plane: '空客A330', depH: 19, depM: 35, durMins: 135, factor: 1.12, rate: '99%' },
-                        { code: '9C8821', name: '春秋航空', plane: '空客A320', depH: 21, depM: 50, durMins: 140, factor: 0.68, rate: '94%' }
+                        { code: '9C8821', name: '春秋航空', plane: '空客A320', depH: 21, depM: 50, durMins: 140, factor: 0.68, rate: '94%' },
+                        { code: 'MF8316', name: '厦门航空', plane: '波音787', depH: 22, depM: 45, durMins: 130, factor: 0.88, rate: '98%' },
+                        { code: '3U8920', name: '四川航空', plane: '空客A321', depH: 23, depM: 35, durMins: 140, factor: 0.76, rate: '97%' }
                     ];
+
+                    const isToday = String(dateStr).trim() === this.getDateStrOffset(0);
+                    const now = new Date();
+                    const nowTotalMins = now.getHours() * 60 + now.getMinutes();
+
+                    // 若是当天购票，过滤掉起飞时间早于或等于当前时间的班次
+                    let airlines = isToday
+                        ? rawAirlines.filter(a => (a.depH * 60 + a.depM) > nowTotalMins + 5)
+                        : rawAirlines.slice(0, 6);
+
+                    // 若今天当前时间已晚（剩余班次不足3班），从当前时间往后动态顺延生成晚间/红眼航班，保证绝不出现早于当前时间的班次
+                    if (isToday && airlines.length < 3) {
+                        const dynamicPool = [
+                            { code: 'MU9182', name: '东方航空', plane: '空客A320', durMins: 135, factor: 0.82, rate: '98%' },
+                            { code: 'CZ6720', name: '南方航空', plane: '波音738', durMins: 130, factor: 0.79, rate: '97%' },
+                            { code: 'CA4508', name: '中国国航', plane: '空客A321', durMins: 140, factor: 0.95, rate: '99%' },
+                            { code: 'HO1902', name: '吉祥航空', plane: '空客A320', durMins: 135, factor: 0.75, rate: '96%' }
+                        ];
+                        airlines = [];
+                        for (let i = 0; i < dynamicPool.length; i++) {
+                            const nextMins = nowTotalMins + 25 + i * 35;
+                            if (nextMins >= 24 * 60) break;
+                            airlines.push({
+                                ...dynamicPool[i],
+                                depH: Math.floor(nextMins / 60),
+                                depM: nextMins % 60
+                            });
+                        }
+                        if (airlines.length === 0) {
+                            airlines.push({
+                                code: 'MU9998', name: '东方航空', plane: '空客A320',
+                                depH: 23, depM: 59, durMins: 130, factor: 0.8, rate: '98%'
+                            });
+                        }
+                    }
 
                     const flights = airlines.map((a, idx) => {
                         const rawP = Math.round(baseDistPrice * a.factor * (isFirst ? 2.6 : 1));
@@ -23677,7 +24153,7 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
                     this.renderUnifiedCheckoutPage();
                 },
 
-                // ==================== 火车票算法推导（二等/一等/软卧/无座统一显示有票） ====================
+                // ==================== 火车票算法推导（当天自动过滤早于当前时间的班次，统一显示有票） ====================
                 renderTrainListPage: function(fromCity, toCity, dateStr) {
                     this.currentListMode = 'train';
                     let hash = 0;
@@ -23685,14 +24161,50 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
                     for (let i = 0; i < seedStr.length; i++) hash = seedStr.charCodeAt(i) + ((hash << 5) - hash);
                     const baseSecondPrice = 145 + (Math.abs(hash) % 280);
 
-                    const rawTrains = [
+                    const allRawTrains = [
                         { no: 'G102', depH: 7, depM: 30, durMins: 165, type: '复兴号智能动车' },
                         { no: 'G356', depH: 9, depM: 15, durMins: 180, type: '和谐号高速动车' },
                         { no: 'D218', depH: 11, depM: 45, durMins: 210, type: '动车组列车' },
                         { no: 'G88', depH: 14, depM: 20, durMins: 150, type: '复兴号标杆车' },
                         { no: 'G612', depH: 17, depM: 5, durMins: 175, type: '高速动车组' },
-                        { no: 'D908', depH: 20, depM: 10, durMins: 225, type: '动卧列车' }
+                        { no: 'D908', depH: 20, depM: 10, durMins: 225, type: '动卧列车' },
+                        { no: 'G892', depH: 21, depM: 35, durMins: 160, type: '复兴号智能动车' },
+                        { no: 'D936', depH: 22, depM: 50, durMins: 200, type: '夜间动卧列车' }
                     ];
+
+                    const isToday = String(dateStr).trim() === this.getDateStrOffset(0);
+                    const now = new Date();
+                    const nowTotalMins = now.getHours() * 60 + now.getMinutes();
+
+                    // 若是当天购票，过滤掉发车时间早于或等于当前时间的列车
+                    let rawTrains = isToday
+                        ? allRawTrains.filter(t => (t.depH * 60 + t.depM) > nowTotalMins + 5)
+                        : allRawTrains.slice(0, 6);
+
+                    // 若今天当前时间已晚（剩余车次不足3趟），从当前时间往后动态顺延生成后续车次，保证绝不出现早于当前时间的车次
+                    if (isToday && rawTrains.length < 3) {
+                        const dynamicTrainPool = [
+                            { no: 'G7302', durMins: 160, type: '复兴号高速动车' },
+                            { no: 'D916', durMins: 195, type: '智能动卧列车' },
+                            { no: 'G7588', durMins: 155, type: '和谐号动车组' },
+                            { no: 'D952', durMins: 210, type: '夕发朝至动卧' }
+                        ];
+                        rawTrains = [];
+                        for (let i = 0; i < dynamicTrainPool.length; i++) {
+                            const nextMins = nowTotalMins + 20 + i * 35;
+                            if (nextMins >= 24 * 60) break;
+                            rawTrains.push({
+                                ...dynamicTrainPool[i],
+                                depH: Math.floor(nextMins / 60),
+                                depM: nextMins % 60
+                            });
+                        }
+                        if (rawTrains.length === 0) {
+                            rawTrains.push({
+                                no: 'D998', depH: 23, depM: 58, durMins: 190, type: '夜间动卧列车'
+                            });
+                        }
+                    }
 
                     const trains = rawTrains.map((t, idx) => {
                         const p2 = Math.round(baseSecondPrice * (t.no.startsWith('G') ? 1.15 : 0.85));
@@ -23794,6 +24306,7 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
                         arrTime: t.arrTime,
                         seatTypeName: seat.name,
                         selectedSeatCode: 'F',
+                        selectedSeats: ['1F'],
                         unitPrice: seat.price,
                         extraPerPax: 0,
                         extraLabel: '',
@@ -23829,7 +24342,7 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
                         document.getElementById('trv-subpage-list').classList.add('show');
                     } else {
                         const modeZh = mode === 'hotel' ? '品质酒店' : (mode === 'scenic' ? '热门景点与门票' : '精品跟团游路线');
-                        this.showDialog(`生成「${dest}」${modeZh}`, `是否调用一次 API 搜索并生成「${dest}」当地的 ${modeZh} 列表及详情？`, () => {
+                        this.showDialog(`生成「${dest}」${modeZh}`, `是否调用API生成「${dest}」的${modeZh}详情？`, () => {
                             this.generateTravelItemsByAPI(mode, dest);
                         }, true);
                     }
@@ -23839,7 +24352,7 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
                     const dest = (appData.travel.currentDestination || '杭州').trim();
                     const mode = this.currentListMode;
                     if (mode !== 'hotel' && mode !== 'scenic' && mode !== 'tour') return;
-                    this.showDialog('重新生成列表', `确认调用 API 重新生成「${dest}」当前分类下的全部内容吗？`, () => {
+                    this.showDialog('重新生成列表', `确认调用API重新生成「${dest}」下的内容吗？`, () => {
                         this.generateTravelItemsByAPI(mode, dest);
                     }, true);
                 },
@@ -23852,13 +24365,13 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
 
                     try {
                         const conf = this.getApiConfig();
-                        this.showDialog('正在生成出行图录...', `正在调用 API 检索并生成「${destCity}」的 ${count} 个精选条目与评价...`, null, false, true);
+                        this.showDialog('正在生成出行图录...', `正在调用API生成${count}个精选内容...`, null, false, true);
 
                         let sysPrompt = '';
                         if (mode === 'hotel') {
                             sysPrompt = `你是专业的高端旅行预订平台数据引擎（严禁出现任何第三方软件名称）。
 当前目的地为：「${destCity}」。请生成 ${count} 家符合「${destCity}」地理特色与著名商圈的精品酒店或度假村！
-直接输出纯 JSON 数组，严禁 markdown 代码块标记，每个酒店对象格式严格如下：
+直接输出纯 JSON 数组，严禁 markdown 代码块标记，每个酒店对象格式严格如下（其中 reviews 请随机生成 3~6 条评价）：
 [
   {
     "name": "酒店全称（含城市或地标名）",
@@ -23886,7 +24399,7 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
                         } else if (mode === 'scenic') {
                             sysPrompt = `你是专业的高端旅行预订平台数据引擎（严禁出现任何第三方软件名称）。
 当前目的地为：「${destCity}」。请生成 ${count} 个「${destCity}」最出名的风景名胜、历史建筑、博物馆或主题乐园！
-直接输出纯 JSON 数组，严禁 markdown 代码块标记，每个景区对象格式严格如下：
+直接输出纯 JSON 数组，严禁 markdown 代码块标记，每个景区对象格式严格如下（其中 reviews 请随机生成 3~6 条评价）：
 [
   {
     "name": "景区/地标名称",
@@ -23914,7 +24427,7 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
                             sysPrompt = `你是专业的高端旅行定制与跟团游引擎（严禁出现任何第三方软件名称）。
 出发地：「${tp.fromCity}」，目的地：「${destCity}」，出发日期：「${tp.dateStr}」。
 请生成 ${count} 条不同旅行社推出的「${destCity}」特色跟团游/私家小团产品（涵盖3日游/4日游等不同主题）。
-直接输出纯 JSON 数组，严禁 markdown 代码块标记，格式严格如下：
+直接输出纯 JSON 数组，严禁 markdown 代码块标记，格式严格如下（其中 reviews 请随机生成 3~6 条评价）：
 [
   {
     "name": "跟团游产品标题（如：${destCity}深度纯玩3日私家团·住高星景观酒店）",
@@ -23985,24 +24498,27 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
                         if (!Array.isArray(arr)) arr = arr.items || arr.list || [];
 
                         const enriched = await Promise.all(arr.map(async (item, idx) => {
-                            const imgUrl = await this.fetchPublicScenicPhotoUrl(item.wikiQuery || `${destCity} ${item.name}`, mode, idx);
+                            const exactSearchQuery = `${destCity} ${item.name || ''} ${item.wikiQuery || ''}`.trim();
+                            const imgUrl = await this.fetchPublicScenicPhotoUrl(exactSearchQuery, mode, idx);
                             this.preloadSingleImage(imgUrl);
 
                             // 若为跟团游，为每日行程每一天并发拉取专属在线实景配图
                             if (mode === 'tour' && Array.isArray(item.dailySchedule)) {
                                 item.dailySchedule = await Promise.all(item.dailySchedule.map(async (dItem, dIdx) => {
                                     if (typeof dItem === 'string') {
-                                        const dUrl = await this.fetchPublicScenicPhotoUrl(`${destCity} landmark ${dIdx}`, 'scenic', idx + dIdx);
+                                        const dTitle = dItem.split('➔')[0] || `第${dIdx + 1}天行程`;
+                                        const dUrl = await this.fetchPublicScenicPhotoUrl(`${destCity} ${dTitle}`, 'scenic', idx * 3 + dIdx);
                                         this.preloadSingleImage(dUrl);
                                         return {
                                             day: `D${dIdx + 1}`,
-                                            title: dItem.split('➔')[0] || `第${dIdx + 1}天行程`,
+                                            title: dTitle,
                                             desc: dItem,
                                             spotName: `${destCity}精选景点`,
                                             imageUrl: dUrl
                                         };
                                     } else {
-                                        const dUrl = await this.fetchPublicScenicPhotoUrl(dItem.wikiQuery || `${destCity} ${dItem.spotName || dItem.title}`, 'scenic', idx + dIdx);
+                                        const daySpotQuery = `${destCity} ${dItem.spotName || dItem.title || ''} ${dItem.wikiQuery || ''}`.trim();
+                                        const dUrl = await this.fetchPublicScenicPhotoUrl(daySpotQuery, 'scenic', idx * 3 + dIdx);
                                         this.preloadSingleImage(dUrl);
                                         return { ...dItem, imageUrl: dUrl };
                                     }
@@ -24304,8 +24820,10 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
                                 <div style="display:flex; flex-direction:column; gap:12px;">
                                     ${scheduleArr.map(sc => `
                                         <div style="display:flex; gap:12px; padding:10px; background:#f8fafc; border-radius:14px; border:0.5px solid #e2e8f0; align-items:center;">
-                                            <div style="width:78px; height:78px; border-radius:10px; background-color:#cbd5e1; background-image:url('${sc.imageUrl}'); background-size:cover; background-position:center; flex-shrink:0; position:relative; overflow:hidden;">
-                                                <span style="position:absolute; top:4px; left:4px; background:rgba(0,102,255,0.92); color:#fff; font-size:10px; font-weight:900; padding:1.5px 6px; border-radius:6px;">${sc.day}</span>
+                                            <div style="width:78px; height:78px; border-radius:10px; background:linear-gradient(135deg, #e0f2fe 0%, #dbeafe 100%); flex-shrink:0; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center;">
+                                                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#93c5fd" stroke-width="1.8"><path d="m8 3 4 8 5-5 5 15H2L8 3z"></path><circle cx="17" cy="5" r="2"></circle></svg>
+                                                ${sc.imageUrl ? `<img src="${sc.imageUrl}" style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:1; display:block;" onerror="this.style.display='none'">` : ''}
+                                                <span style="position:absolute; top:4px; left:4px; z-index:2; background:rgba(0,102,255,0.92); color:#fff; font-size:10px; font-weight:900; padding:1.5px 6px; border-radius:6px;">${sc.day}</span>
                                             </div>
                                             <div style="flex:1; min-width:0;">
                                                 <div style="font-size:13.5px; font-weight:900; color:#0f172a; line-height:1.3;">${sc.title}</div>
@@ -24331,10 +24849,12 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
                     }
 
                     body.innerHTML = `
-                        <!-- 顶部实景大图横幅（固定高度 210px 防止任何 Tab 切换缩放，左侧显示完整全称，右侧评分向左留足间距） -->
-                        <div style="width:100%; height:210px; min-height:210px; flex-shrink:0; background-color:#cbd5e1; background-image:url('${item.imageUrl||''}'); background-size:cover; background-position:center; position:relative;">
-                            <div style="position:absolute; inset:0; background:linear-gradient(180deg, rgba(15,23,42,0.12) 0%, rgba(15,23,42,0.82) 100%);"></div>
-                            <div style="position:absolute; bottom:14px; left:16px; right:22px; color:#fff; display:flex; justify-content:space-between; align-items:flex-end; gap:14px;">
+                        <!-- 顶部实景大图横幅（固定高度 210px 防止任何 Tab 切换缩放，图片未加载出来时仅背景显示渐变占位，文字正常） -->
+                        <div style="width:100%; height:210px; min-height:210px; flex-shrink:0; background:linear-gradient(135deg, #1e293b 0%, #334155 100%); position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center;">
+                            <svg viewBox="0 0 24 24" width="42" height="42" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                            ${item.imageUrl ? `<img src="${item.imageUrl}" style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:1; display:block;" onerror="this.style.display='none'">` : ''}
+                            <div style="position:absolute; inset:0; z-index:2; background:linear-gradient(180deg, rgba(15,23,42,0.12) 0%, rgba(15,23,42,0.82) 100%);"></div>
+                            <div style="position:absolute; bottom:14px; left:16px; right:22px; z-index:3; color:#fff; display:flex; justify-content:space-between; align-items:flex-end; gap:14px;">
                                 <div style="flex:1; min-width:0;">
                                     <div style="font-size:17.5px; font-weight:900; line-height:1.3; text-shadow:0 2px 6px rgba(0,0,0,0.45); word-break:break-word;">${item.name}</div>
                                     <div style="font-size:11.5px; opacity:0.92; margin-top:4px; line-height:1.35;">${specificAddress}</div>
@@ -24501,6 +25021,33 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
                     this.renderUnifiedCheckoutPage();
                 },
 
+                // 根据当前出行总人数自动同步火车票多选座位数组与当前激活选座人索引
+                syncTrainSeatsCount: function(ctx, totalPax) {
+                    if (!ctx || ctx.orderType !== 'train') return;
+                    const allSeatPool = ['1F', '1D', '1C', '1B', '1A', '2F', '2D', '2C', '2B', '2A', '3F', '3D', '3C', '3B', '3A'];
+                    if (!Array.isArray(ctx.selectedSeats) || ctx.selectedSeats.length === 0) {
+                        ctx.selectedSeats = allSeatPool.slice(0, totalPax);
+                    } else if (ctx.selectedSeats.length > totalPax) {
+                        ctx.selectedSeats = ctx.selectedSeats.slice(0, totalPax);
+                    } else if (ctx.selectedSeats.length < totalPax) {
+                        for (let s of allSeatPool) {
+                            if (ctx.selectedSeats.length >= totalPax) break;
+                            if (!ctx.selectedSeats.includes(s)) ctx.selectedSeats.push(s);
+                        }
+                    }
+                    if (typeof ctx.activeSeatPaxIdx !== 'number' || ctx.activeSeatPaxIdx < 0 || ctx.activeSeatPaxIdx >= totalPax) {
+                        ctx.activeSeatPaxIdx = 0;
+                    }
+                },
+
+                // 点击「座位对应」里的某个人，切换当前正在为谁选座
+                selectActiveSeatPassenger: function(paxIdx) {
+                    const ctx = this.activeBookingContext;
+                    if (!ctx || ctx.orderType !== 'train') return;
+                    ctx.activeSeatPaxIdx = paxIdx;
+                    this.renderUnifiedCheckoutPage();
+                },
+
                 // ==================== 统一预订确认全屏页（顶栏统一显示“订单支付确认”） ====================
                 renderUnifiedCheckoutPage: function() {
                     const ctx = this.activeBookingContext;
@@ -24516,11 +25063,14 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
 
                     const u = this.getCurrentUserObj();
                     const companions = this.selectedCompanionIds.map(id => (appData.charCards || []).find(c => c.id === id)).filter(Boolean);
-                    const totalPax = 1 + companions.length;
+                    const passengerNames = [u.name || '我', ...companions.map(c => c.name)];
+                    const totalPax = passengerNames.length;
 
-                    let specialSectionHtml = '';
+                    let topSpecialSectionHtml = '';
+                    let bottomTrainSeatSectionHtml = '';
+
                     if (ctx.orderType === 'hotel') {
-                        specialSectionHtml = `
+                        topSpecialSectionHtml = `
                             <div style="background:#fff; border-radius:16px; padding:14px; display:flex; justify-content:space-between; align-items:center;">
                                 <div>
                                     <div style="font-size:13.5px; font-weight:800; color:#0f172a;">预订房间数量</div>
@@ -24533,42 +25083,95 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
                                 </div>
                             </div>`;
                     } else if (ctx.orderType === 'scenic' || ctx.orderType === 'tour') {
-                        specialSectionHtml = `
+                        topSpecialSectionHtml = `
                             <div style="background:#fff; border-radius:16px; padding:14px;">
                                 <div style="font-size:13px; font-weight:800; color:#0f172a; margin-bottom:6px;">选择游玩/出发日期 (YYYY-MM-DD)</div>
                                 <textarea id="trv-co-play-date" class="trv-textarea-single" rows="1" oninput="window.TravelApp.activeBookingContext.dateStr=this.value.trim()">${ctx.dateStr}</textarea>
                             </div>`;
                     } else if (ctx.orderType === 'train') {
+                        this.syncTrainSeatsCount(ctx, totalPax);
+                        const activePaxIdx = ctx.activeSeatPaxIdx || 0;
+                        const activePaxName = passengerNames[activePaxIdx] || passengerNames[0];
                         const seats = [
                             { code: 'A', pos: '靠窗' }, { code: 'B', pos: '中间' }, { code: 'C', pos: '过道' },
                             { code: 'D', pos: '过道' }, { code: 'F', pos: '靠窗' }
                         ];
-                        specialSectionHtml = `
+                        const posDescMap = { 'A': '靠窗', 'B': '中间', 'C': '过道', 'D': '过道', 'F': '靠窗' };
+                        const rowCount = Math.max(1, Math.min(3, Math.ceil(totalPax / 2)));
+                        let rowsHtml = '';
+                        for (let r = 1; r <= rowCount; r++) {
+                            rowsHtml += `
+                                <div style="display:flex; align-items:center; justify-content:space-between; background:#f8fafc; padding:10px 12px; border-radius:12px;">
+                                    <span style="font-size:10.5px; color:#64748b; font-weight:800; width:32px;">${rowCount > 1 ? `第${r}排` : '窗'}</span>
+                                    <div style="display:flex; gap:6px;">
+                                        ${seats.slice(0,3).map(s => {
+                                            const key = `${r}${s.code}`;
+                                            const selIdx = ctx.selectedSeats.indexOf(key);
+                                            const isSel = selIdx >= 0;
+                                            const isCurActivePaxSeat = (selIdx === activePaxIdx);
+                                            const paxLabel = isSel && passengerNames[selIdx] ? passengerNames[selIdx].slice(0, 3) : s.pos;
+                                            const activeBorderStyle = isCurActivePaxSeat ? 'box-shadow:0 0 0 2.5px #ff9500, 0 4px 10px rgba(0,102,255,0.25); transform:scale(1.04);' : '';
+                                            return `
+                                            <div class="trv-seat-btn ${isSel?'selected':''}" style="${activeBorderStyle}" onclick="window.TravelApp.selectTrainSeatCode('${key}')">
+                                                <span>${s.code}</span>
+                                                <span style="font-size:8px; font-weight:${isSel?'800':'500'}; max-width:34px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${paxLabel}</span>
+                                            </div>`;
+                                        }).join('')}
+                                    </div>
+                                    <span style="font-size:10px; color:#94a3b8; padding:0 2px;">过道</span>
+                                    <div style="display:flex; gap:6px;">
+                                        ${seats.slice(3).map(s => {
+                                            const key = `${r}${s.code}`;
+                                            const selIdx = ctx.selectedSeats.indexOf(key);
+                                            const isSel = selIdx >= 0;
+                                            const isCurActivePaxSeat = (selIdx === activePaxIdx);
+                                            const paxLabel = isSel && passengerNames[selIdx] ? passengerNames[selIdx].slice(0, 3) : s.pos;
+                                            const activeBorderStyle = isCurActivePaxSeat ? 'box-shadow:0 0 0 2.5px #ff9500, 0 4px 10px rgba(0,102,255,0.25); transform:scale(1.04);' : '';
+                                            return `
+                                            <div class="trv-seat-btn ${isSel?'selected':''}" style="${activeBorderStyle}" onclick="window.TravelApp.selectTrainSeatCode('${key}')">
+                                                <span>${s.code}</span>
+                                                <span style="font-size:8px; font-weight:${isSel?'800':'500'}; max-width:34px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${paxLabel}</span>
+                                            </div>`;
+                                        }).join('')}
+                                    </div>
+                                    <span style="font-size:10.5px; color:#64748b; font-weight:700;">窗</span>
+                                </div>`;
+                        }
+
+                        const previewAssignHtml = passengerNames.map((pName, pIdx) => {
+                            const sKey = ctx.selectedSeats[pIdx] || `${1}${seats[pIdx % 5].code}`;
+                            const rNo = parseInt(sKey) || 1;
+                            const cLetter = sKey.replace(/^\d+/, '') || 'F';
+                            const posTxt = posDescMap[cLetter] || '';
+                            const isCurActive = (pIdx === activePaxIdx);
+                            return `
+                            <div onclick="window.TravelApp.selectActiveSeatPassenger(${pIdx})" style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:7px 11px; border-radius:10px; cursor:pointer; transition:all 0.15s; border:1.5px solid ${isCurActive ? '#0066ff' : '#e2e8f0'}; background:${isCurActive ? '#eff6ff' : '#f8fafc'}; box-shadow:${isCurActive ? '0 2px 8px rgba(0,102,255,0.12)' : 'none'};">
+                                <div style="display:flex; align-items:center; gap:6px;">
+                                    <span style="width:7px; height:7px; border-radius:50%; background:${isCurActive ? '#0066ff' : '#94a3b8'};"></span>
+                                    <span style="font-size:12px; font-weight:800; color:${isCurActive ? '#0066ff' : '#1e293b'};">${pName}</span>
+                                    ${isCurActive ? `<span style="font-size:9.5px; background:#0066ff; color:#fff; padding:1px 5px; border-radius:4px; font-weight:700;">正在选座</span>` : `<span style="font-size:9.5px; color:#94a3b8;">点击切换</span>`}
+                                </div>
+                                <span style="font-size:11.5px; font-weight:900; color:${isCurActive ? '#0066ff' : '#0f172a'}; font-family:monospace; background:#ffffff; padding:2px 8px; border-radius:6px; border:0.5px solid #cbd5e1;">
+                                    ${rowCount > 1 ? `第${rNo}排` : ''}${cLetter}座 (${posTxt}) · ${ctx.seatTypeName}票
+                                </span>
+                            </div>`;
+                        }).join('');
+
+                        bottomTrainSeatSectionHtml = `
                             <div style="background:#fff; border-radius:16px; padding:14px;">
                                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                                     <span style="font-size:13.5px; font-weight:800; color:#0f172a;">在线选座 (${ctx.seatTypeName})</span>
-                                    <span style="font-size:11px; color:#0066ff; font-weight:700;">系统将按所选偏好自动连座分配车厢</span>
+                                    <span style="font-size:11px; color:#0066ff; font-weight:800;">当前为「${activePaxName}」选座</span>
                                 </div>
-                                <div style="display:flex; align-items:center; justify-content:space-between; background:#f8fafc; padding:12px; border-radius:12px;">
-                                    <span style="font-size:11px; color:#64748b; font-weight:700;">窗</span>
-                                    <div style="display:flex; gap:6px;">
-                                        ${seats.slice(0,3).map(s => `
-                                            <div class="trv-seat-btn ${ctx.selectedSeatCode===s.code?'selected':''}" onclick="window.TravelApp.selectTrainSeatCode('${s.code}')">
-                                                <span>${s.code}</span>
-                                                <span style="font-size:8px; font-weight:500;">${s.pos}</span>
-                                            </div>
-                                        `).join('')}
+                                <div style="display:flex; flex-direction:column; gap:8px;">
+                                    ${rowsHtml}
+                                </div>
+                                <div style="margin-top:12px; padding-top:10px; border-top:0.5px dashed #e2e8f0; display:flex; flex-direction:column; gap:6px;">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
+                                        <span style="font-size:11.5px; color:#475569; font-weight:800;">座位对应票面 (点击下方姓名可为TA指定座位)：</span>
+                                        <span style="font-size:10.5px; color:#64748b;">已分配 ${ctx.selectedSeats.length}/${totalPax} 人</span>
                                     </div>
-                                    <span style="font-size:10px; color:#94a3b8; padding:0 4px;">过道</span>
-                                    <div style="display:flex; gap:6px;">
-                                        ${seats.slice(3).map(s => `
-                                            <div class="trv-seat-btn ${ctx.selectedSeatCode===s.code?'selected':''}" onclick="window.TravelApp.selectTrainSeatCode('${s.code}')">
-                                                <span>${s.code}</span>
-                                                <span style="font-size:8px; font-weight:500;">${s.pos}</span>
-                                            </div>
-                                        `).join('')}
-                                    </div>
-                                    <span style="font-size:11px; color:#64748b; font-weight:700;">窗</span>
+                                    ${previewAssignHtml}
                                 </div>
                             </div>`;
                     }
@@ -24582,7 +25185,7 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
                             ${ctx.extraLabel ? `<div style="font-size:11.5px; color:#64748b; margin-top:4px;">${ctx.extraLabel} · 准点率 ${ctx.punctuality||'98%'}</div>` : ''}
                         </div>
 
-                        ${specialSectionHtml}
+                        ${topSpecialSectionHtml}
 
                         <!-- 出行人/入住人/游客选择（当前面具 + 勾选角色卡） -->
                         <div style="background:#ffffff; border-radius:16px; padding:14px;">
@@ -24605,6 +25208,9 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
                                 `).join('')}
                             </div>
                         </div>
+
+                        <!-- 火车票在线选座（位于出行人下方，支持点击座位对应栏的姓名精准选座） -->
+                        ${bottomTrainSeatSectionHtml}
 
                         <!-- 优惠券抵扣栏 -->
                         <div onclick="window.TravelApp.openCouponsBagModal(true)" style="background:#ffffff; border-radius:16px; padding:14px; display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
@@ -24644,9 +25250,30 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
                     this.recalculateCheckoutTotal();
                 },
 
-                selectTrainSeatCode: function(code) {
-                    if (!this.activeBookingContext) return;
-                    this.activeBookingContext.selectedSeatCode = code;
+                selectTrainSeatCode: function(seatKey) {
+                    const ctx = this.activeBookingContext;
+                    if (!ctx) return;
+                    const totalPax = 1 + this.selectedCompanionIds.length;
+                    this.syncTrainSeatsCount(ctx, totalPax);
+                    const activeIdx = ctx.activeSeatPaxIdx || 0;
+
+                    if (totalPax === 1) {
+                        ctx.selectedSeats = [seatKey];
+                        ctx.selectedSeatCode = seatKey.replace(/^\d+/, '');
+                    } else {
+                        const occupiedByIdx = ctx.selectedSeats.indexOf(seatKey);
+                        if (occupiedByIdx === activeIdx) {
+                            // 点击的正是当前选座人自己的座位，无需变动
+                        } else if (occupiedByIdx >= 0) {
+                            // 若点击了其他同行人已占的座位，则自动将两人的座位互换
+                            const temp = ctx.selectedSeats[activeIdx];
+                            ctx.selectedSeats[activeIdx] = seatKey;
+                            ctx.selectedSeats[occupiedByIdx] = temp;
+                        } else {
+                            // 点击了空座位，直接将该座位分配给当前选中的出行人
+                            ctx.selectedSeats[activeIdx] = seatKey;
+                        }
+                    }
                     this.renderUnifiedCheckoutPage();
                 },
 
@@ -24745,7 +25372,7 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
                     if (rowEl) rowEl.innerText = chosenCp ? `-¥${disc} (${chosenCp.title}) ›` : '点击选择可用券 ›';
                 },
 
-                // ==================== 提交订单（跟团游合并为单一总订单 + 保存完整生成快照 rawSnapshot） ====================
+                // ==================== 提交订单（跟团游合并为单一总订单 + 精确记录每个人的车次车厢与具体座位号） ====================
                 submitBookingOrder: function() {
                     const ctx = this.activeBookingContext;
                     if (!ctx) return;
@@ -24769,13 +25396,17 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
 
                     let seatAllocations = [];
                     if (ctx.orderType === 'train') {
+                        this.syncTrainSeatsCount(ctx, passengerNames.length);
                         const carriage = String(Math.floor(2 + Math.random() * 12)).padStart(2, '0');
-                        const rowNum = String(Math.floor(3 + Math.random() * 14)).padStart(2, '0');
-                        const cols = ['A', 'B', 'C', 'D', 'F'];
-                        const baseColIdx = Math.max(0, cols.indexOf(ctx.selectedSeatCode || 'F'));
+                        const baseRowNum = Math.floor(3 + Math.random() * 12);
+                        const posDescMap = { 'A': '靠窗', 'B': '中间', 'C': '过道', 'D': '过道', 'F': '靠窗' };
                         seatAllocations = passengerNames.map((pName, pIdx) => {
-                            const colLetter = cols[(baseColIdx + pIdx) % cols.length];
-                            return `${pName}(${carriage}车${rowNum}${colLetter}号)`;
+                            const sKey = (ctx.selectedSeats && ctx.selectedSeats[pIdx]) ? ctx.selectedSeats[pIdx] : `1F`;
+                            const rOffset = (parseInt(sKey) || 1) - 1;
+                            const colLetter = sKey.replace(/^\d+/, '') || 'F';
+                            const finalRow = String(baseRowNum + rOffset).padStart(2, '0');
+                            const posHint = posDescMap[colLetter] || '';
+                            return `${pName}(${carriage}车${finalRow}${colLetter}号${posHint ? '·' + posHint : ''})`;
                         });
                     } else if (ctx.orderType === 'flight') {
                         const rowNum = String(Math.floor(11 + Math.random() * 22)).padStart(2, '0');
