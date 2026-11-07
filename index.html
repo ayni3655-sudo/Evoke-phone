@@ -13982,20 +13982,48 @@ if (badgeEl) {
                 searchAndRenderSongs: async function(kw) {
                     const listEl = document.getElementById('cm-home-song-list');
                     if (!listEl) return;
-                    listEl.innerHTML = `<div style="text-align:center; padding:36px 0; color:#8e8e93; font-size:12.5px;">正在检索云端曲库...</div>`;
 
+                    // 记录当前搜索请求序号，防止前一次自动推荐覆盖用户手动搜索的结果
+                    const reqSeq = (this._searchReqSeq = (this._searchReqSeq || 0) + 1);
+
+                    listEl.innerHTML = `
+                        <div style="display:flex; align-items:center; justify-content:center; gap:8px; padding:36px 0; color:#8e8e93; font-size:12.5px;">
+                            <div class="st-music-loading-spinner"></div>
+                            <span>正在云端检索歌曲...</span>
+                        </div>`;
+
+                    // 完全对齐故事 APP 的 limit=100 大基数检索，并增加 allorigins 备用代理通道
+                    const neteasePcUrl = 'https://music.163.com/api/cloudsearch/pc?s=' + encodeURIComponent(kw) + '&type=1&offset=0&limit=100';
+                    const neteaseSearchUrl = 'https://music.163.com/api/search/get/web?s=' + encodeURIComponent(kw) + '&type=1&offset=0&total=true&limit=100';
                     const endpoints = [
-                        `https://apis.netstart.cn/music/cloudsearch?keywords=${encodeURIComponent(kw)}&limit=40&offset=0&type=1`,
-                        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent('https://music.163.com/api/cloudsearch/pc?s=' + encodeURIComponent(kw) + '&type=1&offset=0&limit=40')}`,
-                        `https://apis.netstart.cn/music/search?keywords=${encodeURIComponent(kw)}&limit=40&offset=0&type=1`
+                        `https://apis.netstart.cn/music/cloudsearch?keywords=${encodeURIComponent(kw)}&limit=100&offset=0&type=1`,
+                        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(neteasePcUrl)}`,
+                        `https://apis.netstart.cn/music/search?keywords=${encodeURIComponent(kw)}&limit=100&offset=0&type=1`,
+                        `https://api.allorigins.win/raw?url=${encodeURIComponent(neteaseSearchUrl)}`
                     ];
+
+                    // 带 6 秒超时控制的请求器，防止单个节点卡死导致无法切换备用通道
+                    const fetchWithTimeout = async (url, ms = 6000) => {
+                        const ctrl = new AbortController();
+                        const timer = setTimeout(() => ctrl.abort(), ms);
+                        try {
+                            const res = await fetch(url, { signal: ctrl.signal });
+                            clearTimeout(timer);
+                            return res;
+                        } catch (err) {
+                            clearTimeout(timer);
+                            throw err;
+                        }
+                    };
 
                     let rawSongs = [];
                     for (let ep of endpoints) {
                         try {
-                            const res = await fetch(ep);
+                            const res = await fetchWithTimeout(ep, 6000);
                             if (!res.ok) continue;
-                            const data = await res.json();
+                            const text = await res.text();
+                            if (!text) continue;
+                            const data = JSON.parse(text);
                             if (data?.result?.songs && data.result.songs.length > 0) {
                                 rawSongs = data.result.songs;
                                 break;
@@ -14003,15 +14031,22 @@ if (badgeEl) {
                         } catch (e) {}
                     }
 
-                    rawSongs = rawSongs.filter(s => s.fee !== 1 && s.fee !== 4).slice(0, 22);
-                    if (rawSongs.length === 0) {
-                        listEl.innerHTML = `<div style="text-align:center; padding:36px 0; color:#8e8e93; font-size:12.5px;">未找到可播曲目，请尝试其他关键词</div>`;
+                    // 如果在等待期间用户已经发起了新的搜索，丢弃旧结果
+                    if (reqSeq !== this._searchReqSeq) return;
+
+                    // 优先筛选非 VIP (fee !== 1 && fee !== 4) 的完全免费可播曲目；若全部为 VIP 则保底展示原列表前 25 首
+                    let freeSongs = rawSongs.filter(s => s.fee !== 1 && s.fee !== 4);
+                    let finalSongs = (freeSongs.length > 0 ? freeSongs : rawSongs).slice(0, 25);
+
+                    if (finalSongs.length === 0) {
+                        listEl.innerHTML = `<div style="text-align:center; padding:36px 0; color:#8e8e93; font-size:12.5px;">未搜到相关歌曲，请换个关键词试试</div>`;
                         return;
                     }
 
-                    const normalized = rawSongs.map(s => {
+                    const normalized = finalSongs.map(s => {
                         const artists = (s.ar || s.artists || []).map(a => a.name).join(' / ') || '未知歌手';
-                        const cover = (s.al && s.al.picUrl) ? `${s.al.picUrl}?param=200y200` : '';
+                        const rawPic = (s.al && s.al.picUrl) || (s.album && s.album.picUrl) || '';
+                        const cover = rawPic ? `${rawPic.replace(/^http:\/\//i, 'https://')}?param=200y200` : '';
                         return {
                             id: 'cloud_' + s.id,
                             songId: String(s.id),
@@ -14353,7 +14388,8 @@ if (badgeEl) {
 
                     const endpoints = [
                         `https://apis.netstart.cn/music/lyric?id=${songId}`,
-                        `https://api.injahow.cn/meting/?type=lrc&id=${songId}`
+                        `https://api.injahow.cn/meting/?type=lrc&id=${songId}`,
+                        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent('https://music.163.com/api/song/lyric?id=' + songId + '&lv=1&kv=1&tv=-1')}`
                     ];
                     let rawLrc = '';
                     for (let ep of endpoints) {
@@ -14364,8 +14400,9 @@ if (badgeEl) {
                             try {
                                 const j = JSON.parse(txt);
                                 if (j?.lrc?.lyric) { rawLrc = j.lrc.lyric; break; }
+                                else if (j?.lyric) { rawLrc = j.lyric; break; }
                             } catch (err) {
-                                if (txt.includes('[0')) { rawLrc = txt; break; }
+                                if (txt && txt.includes('[0')) { rawLrc = txt; break; }
                             }
                         } catch (e) {}
                     }
