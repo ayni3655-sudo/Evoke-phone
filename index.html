@@ -14010,12 +14010,21 @@ if (badgeEl) {
                     return colors[Math.abs(hash) % colors.length];
                 },
 
-                // 渲染卖家头像 HTML (角色用裁剪后的缩略图 + data-lazy-avatar 异步加载，NPC用首字彩色圆头像)
+                // 渲染卖家/买家头像 HTML（支持角色ID与名称双重匹配，直接用 img 居中裁剪加载，失败才回退首字头像）
                 buildAvatarHtml: function(sellerObj, size = 20) {
-                    if (sellerObj.isChar && sellerObj.charId) {
-                        const c = (appData.charCards || []).find(x => x.id === sellerObj.charId);
+                    if (!sellerObj) sellerObj = {};
+                    const sName = String(sellerObj.sellerName || sellerObj.name || '闲').trim();
+                    const firstChar = sName.charAt(0) || '闲';
+                    const bg = this.getAvatarColor(sName);
+                    let imgUrl = '';
+
+                    if (sellerObj.isChar || sellerObj.charId) {
+                        const c = (appData.charCards || []).find(x =>
+                            (sellerObj.charId && String(x.id) === String(sellerObj.charId)) ||
+                            (sellerObj.isChar && sName && x.name === sName)
+                        );
                         if (c && (c.avatarThumb || c.avatar)) {
-                            const thumbUrl = c.avatarThumb || c.avatar;
+                            imgUrl = c.avatarThumb || c.avatar;
                             if (!c.avatarThumb && c.avatar && typeof generateThumbnail === 'function' && !c._generatingThumb) {
                                 c._generatingThumb = true;
                                 generateThumbnail(c.avatar, 96).then(resThumb => {
@@ -14023,15 +14032,19 @@ if (badgeEl) {
                                     delete c._generatingThumb;
                                 });
                             }
-                            return `<div class="xj-seller-mini-avatar" data-lazy-avatar="${thumbUrl}" style="width:${size}px;height:${size}px;border-radius:${size/2}px;background-color:#f0f0f2;"></div>`;
                         }
                     }
-                    if (sellerObj.avatar) {
-                        return `<div class="xj-seller-mini-avatar" data-lazy-avatar="${sellerObj.avatar}" style="width:${size}px;height:${size}px;border-radius:${size/2}px;background-color:#f0f0f2;"></div>`;
+                    if (!imgUrl && sellerObj.avatar) {
+                        imgUrl = sellerObj.avatar;
                     }
-                    const firstChar = String(sellerObj.sellerName || sellerObj.name || '闲').trim().charAt(0) || '闲';
-                    const bg = this.getAvatarColor(sellerObj.sellerName || sellerObj.name);
-                    return `<div class="xj-seller-mini-avatar" style="width:${size}px;height:${size}px;border-radius:${size/2}px;background:${bg};font-size:${Math.round(size*0.52)}px;">${firstChar}</div>`;
+
+                    if (imgUrl) {
+                        return `<div class="xj-seller-mini-avatar" style="width:${size}px;height:${size}px;border-radius:50%;background:${bg};font-size:${Math.round(size*0.52)}px;position:relative;overflow:hidden;flex-shrink:0;">
+                            <span>${firstChar}</span>
+                            <img src="${imgUrl}" decoding="async" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;border-radius:50%;" onerror="this.style.display='none'">
+                        </div>`;
+                    }
+                    return `<div class="xj-seller-mini-avatar" style="width:${size}px;height:${size}px;border-radius:50%;background:${bg};font-size:${Math.round(size*0.52)}px;flex-shrink:0;">${firstChar}</div>`;
                 },
 
                 syncHeaderUserUI: function() {
@@ -16281,7 +16294,7 @@ ${historyLines}
                     this.showAlert("已重置闲集数据 ✨", "闲集APP内的商品、聊天、订单及物流动态已全部清空并还原至初始状态，您的钱包余额保持不变");
                 },
 
-                openTradeListPage: function(type) {
+               openTradeListPage: function(type) {
                     this._activeTradeType = type;
                     const prof = this.getCurrentProfile();
                     const titleEl = document.getElementById('xj-tradelist-title');
@@ -16293,10 +16306,14 @@ ${historyLines}
                         if (list.length === 0) {
                             bodyEl.innerHTML = `<div style="text-align:center; padding:60px 20px; color:#8e8e93; font-size:13px;">还没有发布过闲置宝贝哦</div>`;
                         } else {
-                            bodyEl.innerHTML = list.map(g => `
+                            bodyEl.innerHTML = list.map((g, idx) => {
+                                if (!g.imageUrl) {
+                                    g.imageUrl = this.buildGoodImageUrl(g.title, idx);
+                                }
+                                return `
                                 <div onclick="window.XianJiApp.openGoodDetail('${g.id}')" style="background:#fff; border-radius:16px; padding:14px; display:flex; flex-direction:column; gap:10px; box-shadow:0 2px 8px rgba(0,0,0,0.02); cursor:pointer;">
                                     <div style="display:flex; gap:12px; align-items:center;">
-                                        <div style="width:60px; height:60px; border-radius:12px; background:#f8f9fa; display:flex; align-items:center; justify-content:center; font-size:32px; flex-shrink:0; position:relative; overflow:hidden;">${this.buildGoodVisualInnerHtml(g, 30, false)}</div>
+                                        <div style="width:60px; height:60px; border-radius:12px; background:#f8f9fa; display:flex; align-items:center; justify-content:center; font-size:32px; flex-shrink:0; position:relative; overflow:hidden;">${this.buildGoodVisualInnerHtml(g, 30, true)}</div>
                                         <div style="flex:1; min-width:0;">
                                             <div style="font-size:14px; font-weight:700; color:#111; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${g.title}</div>
                                             <div style="font-size:15px; font-weight:800; color:#ff3b30; margin-top:4px;">¥${parseFloat(g.price).toFixed(2)}</div>
@@ -16308,8 +16325,8 @@ ${historyLines}
                                         <button onclick="window.XianJiApp.openPriceModal('${g.id}')" style="padding:6px 14px; border-radius:14px; border:1px solid #d1d5db; background:#fff; color:#111; font-size:12px; font-weight:700; cursor:pointer;">降价</button>
                                         <button onclick="window.XianJiApp.editMyGood('${g.id}')" style="padding:6px 14px; border-radius:14px; border:none; background:#ffda00; color:#111; font-size:12px; font-weight:800; cursor:pointer;">编辑</button>
                                     </div>` : ''}
-                                </div>
-                            `).join('');
+                                </div>`;
+                            }).join('');
                         }
                     } else if (type === 'sold') {
                         titleEl.innerText = '我卖出的';
@@ -16317,8 +16334,17 @@ ${historyLines}
                         if (list.length === 0) {
                             bodyEl.innerHTML = `<div style="text-align:center; padding:60px 20px; color:#8e8e8e; font-size:13px;">还没有卖出过宝贝哦</div>`;
                         } else {
-                            bodyEl.innerHTML = list.map(o => {
-                                const avHtml = this.buildAvatarHtml({ isChar: false, name: o.buyerName }, 22);
+                            bodyEl.innerHTML = list.map((o, idx) => {
+                                if (o.good && !o.good.imageUrl) {
+                                    const origGood = this.findGoodById(o.good.id);
+                                    o.good.imageUrl = (origGood && origGood.imageUrl) ? origGood.imageUrl : this.buildGoodImageUrl(o.good.title, idx);
+                                }
+                                const avHtml = this.buildAvatarHtml({
+                                    isChar: !!(o.buyerIsChar && o.stageIndex >= 7),
+                                    charId: (o.buyerIsChar && o.stageIndex >= 7) ? o.buyerCharId : null,
+                                    avatar: o.buyerAvatar || '',
+                                    name: o.buyerName
+                                }, 22);
                                 const statusTxt = o.stageIndex === 0 ? '买家已付款 · 待发货' : (o.stageIndex < 6 ? '物流运输中' : (o.stageIndex === 6 ? '已签收' : '交易成功'));
                                 return `
                                 <div onclick="window.XianJiApp.openGoodDetail('${o.good.id}')" style="background:#fff; border-radius:16px; padding:14px; display:flex; flex-direction:column; gap:10px; box-shadow:0 2px 8px rgba(0,0,0,0.02); cursor:pointer;">
@@ -16331,7 +16357,7 @@ ${historyLines}
                                         <span style="font-size:11.5px; font-weight:700; color:#ff9500;">${statusTxt}</span>
                                     </div>
                                     <div style="display:flex; gap:12px; align-items:center;">
-                                        <div style="width:56px; height:56px; border-radius:10px; background:#f8f9fa; display:flex; align-items:center; justify-content:center; font-size:30px; position:relative; overflow:hidden; flex-shrink:0;">${this.buildGoodVisualInnerHtml(o.good, 28, false)}</div>
+                                        <div style="width:56px; height:56px; border-radius:10px; background:#f8f9fa; display:flex; align-items:center; justify-content:center; font-size:30px; position:relative; overflow:hidden; flex-shrink:0;">${this.buildGoodVisualInnerHtml(o.good, 28, true)}</div>
                                         <div style="flex:1; min-width:0;">
                                             <div style="font-size:13.5px; font-weight:700; color:#111; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${o.good.title}</div>
                                             <div style="font-size:14px; font-weight:800; color:#ff3b30; margin-top:4px;">实收 ¥${parseFloat(o.totalAmount).toFixed(2)}</div>
@@ -16358,7 +16384,11 @@ ${historyLines}
                         if (list.length === 0) {
                             bodyEl.innerHTML = `<div style="text-align:center; padding:60px 20px; color:#8e8e8e; font-size:13px;">还没有买到过宝贝哦</div>`;
                         } else {
-                            bodyEl.innerHTML = list.map(o => {
+                            bodyEl.innerHTML = list.map((o, idx) => {
+                                if (o.good && !o.good.imageUrl) {
+                                    const origGood = this.findGoodById(o.good.id);
+                                    o.good.imageUrl = (origGood && origGood.imageUrl) ? origGood.imageUrl : this.buildGoodImageUrl(o.good.title, idx);
+                                }
                                 const avHtml = this.buildAvatarHtml(o.good, 22);
                                 const statusTxt = o.stageIndex === 0 ? '等待卖家发货' : (o.stageIndex < 6 ? '物流运输中' : (o.stageIndex === 6 ? '已签收 · 待确认' : '交易成功'));
                                 return `
@@ -16371,7 +16401,7 @@ ${historyLines}
                                         <span style="font-size:11.5px; font-weight:700; color:#ff9500;">${statusTxt}</span>
                                     </div>
                                     <div style="display:flex; gap:12px; align-items:center;">
-                                        <div style="width:56px; height:56px; border-radius:10px; background:#f8f9fa; display:flex; align-items:center; justify-content:center; font-size:30px; position:relative; overflow:hidden; flex-shrink:0;">${this.buildGoodVisualInnerHtml(o.good, 28, false)}</div>
+                                        <div style="width:56px; height:56px; border-radius:10px; background:#f8f9fa; display:flex; align-items:center; justify-content:center; font-size:30px; position:relative; overflow:hidden; flex-shrink:0;">${this.buildGoodVisualInnerHtml(o.good, 28, true)}</div>
                                         <div style="flex:1; min-width:0;">
                                             <div style="font-size:13.5px; font-weight:700; color:#111; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${o.good.title}</div>
                                             <div style="font-size:14px; font-weight:800; color:#ff3b30; margin-top:4px;">实付 ¥${parseFloat(o.totalAmount).toFixed(2)}</div>
@@ -16395,11 +16425,8 @@ ${historyLines}
                         }
                     }
 
+                    this.save();
                     document.getElementById('xj-subpage-tradelist').classList.add('show');
-                    this.runBatchImageLoader('#xj-tradelist-body', 5);
-                    if (window.renderLazyAvatarBatch) {
-                        window.renderLazyAvatarBatch('#xj-tradelist-body', 'data-lazy-avatar', 10, 16);
-                    }
                 },
 
                 openLogisticsModal: function(orderId) {
