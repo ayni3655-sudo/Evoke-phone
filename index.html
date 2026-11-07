@@ -13734,10 +13734,10 @@ if (badgeEl) {
             <div class="xj-modal-mask" id="xj-modal-share-wx" style="z-index:255;" onclick="if(event.target===this) this.style.display='none';">
                 <div class="xj-modal-card">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                        <span style="font-size:16px; font-weight:800; color:#111;" id="xj-share-wx-title">分享至微信聊天</span>
+                        <span style="font-size:16px; font-weight:800; color:#111;" id="xj-share-wx-title">分享至聊天</span>
                         <span onclick="document.getElementById('xj-modal-share-wx').style.display='none'" style="font-size:18px; color:#8e8e93; cursor:pointer;">✕</span>
                     </div>
-                    <div style="font-size:11.5px; color:#8e8e93; margin-bottom:12px;" id="xj-share-wx-sub">选择一个已创建的微信聊天窗口发送卡片</div>
+                    <div style="font-size:11.5px; color:#8e8e93; margin-bottom:12px;" id="xj-share-wx-sub">选择一个已创建的聊天窗口发送卡片</div>
                     <div id="xj-share-wx-list" style="display:flex; flex-direction:column; gap:8px; max-height:280px; overflow-y:auto;"></div>
                 </div>
             </div>
@@ -16690,12 +16690,12 @@ ${historyLines}
                     const titleEl = document.getElementById('xj-share-wx-title');
                     const subEl = document.getElementById('xj-share-wx-sub');
                     const listEl = document.getElementById('xj-share-wx-list');
-                    if (titleEl) titleEl.innerText = shareType === 'chat' ? '分享闲集会话到微信' : '分享闲集订单到微信';
+                    if (titleEl) titleEl.innerText = shareType === 'chat' ? '分享闲集会话到聊天' : '分享闲集订单到聊天';
                     if (subEl) subEl.innerText = shareType === 'chat' ? '发送后对方可查看完整对话记录，并作为聊天与总结上下文' : '发送后卡片将随物流进度实时更新，对方可查看完整详情';
 
                     const chats = appData.chats || [];
                     if (chats.length === 0) {
-                        listEl.innerHTML = `<div style="padding:30px 16px; text-align:center; color:#8e8e93; font-size:13px;">尚未创建任何微信聊天窗口<br><span style="font-size:11.5px;">请先前往「聊天」APP 发起单聊或群聊</span></div>`;
+                        listEl.innerHTML = `<div style="padding:30px 16px; text-align:center; color:#8e8e93; font-size:13px;">尚未创建任何聊天窗口<br><span style="font-size:11.5px;">请先前往聊天发起单聊或群聊</span></div>`;
                     } else {
                         listEl.innerHTML = chats.map(c => {
                             const dispName = c.nickname || c.name || '未命名聊天';
@@ -16811,7 +16811,7 @@ ${historyLines}
                     saveXianjiData();
                     document.getElementById('xj-modal-share-wx').style.display = 'none';
                     const wxName = targetWxChat.nickname || targetWxChat.name || '微信聊天';
-                    this.showAlert("已分享至微信 🎉", `卡片已成功发送到「${wxName}」聊天窗口！\n前往聊天即可点击查看详情或让对方回复`);
+                    this.showAlert("已分享至聊天 🎉", `卡片已成功发送到「${wxName}」聊天窗口！\n前往聊天即可点击查看详情或让对方回复`);
                 }
             };
         </script>
@@ -21947,7 +21947,7 @@ ${isSearch ? `用户正在搜索关键词：「${keyword}」，请结合上述�
 
                     const chats = appData.chats || [];
                     if (chats.length === 0) {
-                        listEl.innerHTML = `<div style="padding:28px 16px; text-align:center; color:#8e8e93; font-size:12.5px;">暂无已创建的微信聊天窗口<br><span style="font-size:11px;">请先前往「聊天」APP 发起单聊或群聊</span></div>`;
+                        listEl.innerHTML = `<div style="padding:28px 16px; text-align:center; color:#8e8e93; font-size:12.5px;">暂无已创建的聊天窗口<br><span style="font-size:11px;">请先前往聊天发起单聊或群聊</span></div>`;
                     } else {
                         listEl.innerHTML = chats.map(c => {
                             let thumb = c.avatarThumb || c.avatar || '';
@@ -26962,13 +26962,91 @@ Rules:
                     }).join('');
                 },
 
+                // 全局查找任意面具下的旅行订单
+                findOrderGlobal: function(orderId) {
+                    this.initData();
+                    const curProf = this.getCurrentProfile();
+                    let found = (curProf.orders || []).find(o => o.id === orderId);
+                    if (found) return { order: found, uid: this.getCurrentUserId() };
+                    for (let uid in (appData.travel.userProfiles || {})) {
+                        const p = appData.travel.userProfiles[uid];
+                        const f = (p.orders || []).find(o => o.id === orderId);
+                        if (f) return { order: f, uid: uid };
+                    }
+                    return null;
+                },
+
+                // 激活待代付的旅行订单（由微信好友同意代付、或用户自己补付时调用）
+                activateUnpaidTravelOrder: function(orderId, payerName, payMethodStr) {
+                    const found = this.findOrderGlobal(orderId);
+                    if (!found || !found.order) return false;
+                    const ord = found.order;
+                    if (ord.status === 'paid' || ord.status === 'used') return true;
+
+                    ord.status = 'paid';
+                    ord.payerName = payerName || '好友';
+                    ord.payMethod = payMethodStr || `由 ${payerName} 代付`;
+                    delete ord.daifuRejectedBy;
+
+                    const seatStr = (ord.seatAllocations && ord.seatAllocations.length) ? ('席位：' + ord.seatAllocations.join(' ')) : '电子凭证已生效';
+                    this.pushNotice(`代付成功 · ${ord.title}`, `${ord.payMethod} ¥${ord.totalPaid}，${seatStr}`, ord.id, true);
+                    this.syncOrderIntoActiveTrip(ord);
+                    this.save();
+
+                    if (this.currentTab === 'me') this.renderMeTab();
+                    if (this.currentTab === 'itinerary') this.renderItineraryTab();
+                    if (this.activeOrderObj && this.activeOrderObj.id === ord.id && document.getElementById('trv-subpage-order-detail').classList.contains('show')) {
+                        this.openOrderDetailById(ord.id);
+                    }
+                    if (window.WeChatSys && document.getElementById('page-chat-view').classList.contains('active')) {
+                        window.WeChatSys.renderMessages(true, 'all');
+                    }
+                    return true;
+                },
+
+                // 用户在订单详情页对待代付订单点击“自己支付”
+                payUnpaidOrderBySelf: function(ordId) {
+                    const found = this.findOrderGlobal(ordId);
+                    if (!found || !found.order) return;
+                    const ord = found.order;
+                    const uid = this.getCurrentUserId();
+                    const uObj = this.getCurrentUserObj();
+                    this.showDialog(
+                        '确认自己支付订单？',
+                        `将从当前面具钱包余额中扣除 ¥${ord.totalPaid} 用于支付「${ord.title}」。`,
+                        () => {
+                            if (window.WalletSys && !window.WalletSys.deductMoney(ord.totalPaid, `旅行预订-${ord.title}`, ord.subTitle, uid)) {
+                                return this.showDialog('钱包余额不足', `当前面具钱包余额不足 ¥${ord.totalPaid}，请先前往手机「钱包」APP 充值！`);
+                            }
+                            this.activateUnpaidTravelOrder(ord.id, uObj.name || '我', '钱包余额支付');
+                            this.showDialog('支付成功', `「${ord.title}」已正式出票生效！`);
+                        },
+                        true
+                    );
+                },
+
+                closeOrderDetailSubpage: function() {
+                    document.getElementById('trv-subpage-order-detail').classList.remove('show');
+                    if (this._openedFromWeChat) {
+                        this._openedFromWeChat = false;
+                        AppNav.goTo('page-chat-view');
+                        if (window.WeChatSys) window.WeChatSys.renderMessages(true, 'all');
+                    }
+                },
+
                 // 成熟商业级高定订单详情页（所有子卡片均加 flex-shrink:0 防止被截断，完整展现票券、酒店、景点与跟团游明细）
-                openOrderDetailById: function(ordId) {
+                openOrderDetailById: function(ordId, fromWeChat = null) {
                     this.normalizeLegacyOrders();
-                    const prof = this.getCurrentProfile();
-                    const ord = (prof.orders || []).find(o => o.id === ordId);
+                    if (fromWeChat !== null) this._openedFromWeChat = fromWeChat;
+                    const found = this.findOrderGlobal(ordId);
+                    const ord = found ? found.order : null;
                     if (!ord) return;
                     this.activeOrderObj = ord;
+
+                    const backBtn = document.querySelector('#trv-subpage-order-detail .trv-fafafa-header > div:first-child');
+                    if (backBtn) {
+                        backBtn.setAttribute('onclick', 'window.TravelApp.closeOrderDetailSubpage()');
+                    }
 
                     const liveState = this.computeOrderLiveState(ord);
                     const isGray = liveState.isGray;
@@ -26980,7 +27058,7 @@ Rules:
                         used: '该订单凭证已在行程中完成核销使用，祝您旅途愉快',
                         refunded: '订单已成功办理退票，实付金额已原路退回钱包账户',
                         expired: '因超过规定时间未办理检票/入住，该订单凭证已自动失效',
-                        unpaid: '正在等待聊天好友为您完成代付，代付成功后自动出票'
+                        unpaid: ord.daifuRejectedBy ? `${ord.daifuRejectedBy}暂未代付，您可重新邀请好友代付或直接自己支付` : '正在等待聊天好友为您完成代付，代付成功后自动出票'
                     };
 
                     const headerBg = isGray
@@ -27022,7 +27100,6 @@ Rules:
                         const scheds = Array.isArray(snap.dailySchedule) ? snap.dailySchedule : [];
 
                         snapshotDetailHtml = `
-                            <!-- 跟团游分块 A：产品特色亮点 -->
                             <div style="background:#ffffff; border-radius:18px; padding:16px; box-shadow:0 2px 12px rgba(0,0,0,0.025); flex-shrink:0;">
                                 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
                                     <div style="display:flex; align-items:center; gap:6px;">
@@ -27036,8 +27113,6 @@ Rules:
                                     ${feats.map(f => `<div style="font-size:12px; color:#1e293b; background:#f8fafc; padding:8px 10px; border-radius:8px; border-left:3px solid #7c3aed; line-height:1.45;">• ${f}</div>`).join('')}
                                 </div>
                             </div>
-
-                            <!-- 跟团游分块 B：一价全包车票、酒店、景区门票明细 -->
                             <div style="background:#ffffff; border-radius:18px; padding:16px; box-shadow:0 2px 12px rgba(0,0,0,0.025); display:flex; flex-direction:column; gap:10px; flex-shrink:0;">
                                 <div style="display:flex; align-items:center; gap:6px;">
                                     <span style="width:4px; height:14px; border-radius:2px; background:#0066ff;"></span>
@@ -27056,8 +27131,6 @@ Rules:
                                     <div style="font-size:12px; color:#1e293b; margin-top:3px; line-height:1.45;">${snap.scenicInfo || `含行程所列核心景区首道大门票`} · ${snap.mealAndCar || '含特色正餐与商务专车'}</div>
                                 </div>
                             </div>
-
-                            <!-- 跟团游分块 C：每日行程路线单 -->
                             ${scheds.length > 0 ? `
                             <div style="background:#ffffff; border-radius:18px; padding:16px; box-shadow:0 2px 12px rgba(0,0,0,0.025); flex-shrink:0;">
                                 <div style="display:flex; align-items:center; gap:6px; margin-bottom:10px;">
@@ -27079,7 +27152,6 @@ Rules:
 
                     const body = document.getElementById('trv-order-detail-body');
                     body.innerHTML = `
-                        <!-- 1. 顶部高定状态横幅卡 -->
                         <div style="background:${headerBg}; border-radius:20px; padding:18px 20px; color:#ffffff; box-shadow:0 8px 24px rgba(15,23,42,0.16); display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
                             <div>
                                 <div style="display:flex; align-items:center; gap:8px;">
@@ -27089,12 +27161,11 @@ Rules:
                                 <div style="font-size:11.5px; color:rgba(255,255,255,0.82); margin-top:5px; line-height:1.4;">${statusSubMap[liveState.code] || ''}</div>
                             </div>
                             <div style="text-align:right; flex-shrink:0; margin-left:12px;">
-                                <div style="font-size:10.5px; color:rgba(255,255,255,0.75);">实付总额</div>
+                                <div style="font-size:10.5px; color:rgba(255,255,255,0.75);">${liveState.code === 'unpaid' ? '待付总额' : '实付总额'}</div>
                                 <div style="font-size:22px; font-weight:900; color:#38bdf8; font-family:monospace;">¥${ord.totalPaid}</div>
                             </div>
                         </div>
 
-                        <!-- 2. 仿真电子票券凭证卡（加 flex-shrink:0 防止被压缩截断） -->
                         <div style="background:#ffffff; border-radius:20px; box-shadow:0 4px 16px rgba(0,0,0,0.035); border:0.5px solid rgba(0,0,0,0.05); flex-shrink:0;">
                             <div style="padding:16px 18px;">
                                 <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
@@ -27124,18 +27195,16 @@ Rules:
                                 </div>
                             </div>
 
-                            <!-- 票券分割虚线 -->
                             <div style="padding:0 18px;">
                                 <div style="width:100%; border-top:1.5px dashed #e2e8f0;"></div>
                             </div>
 
-                            <!-- 电子核销凭证码栏 -->
                             <div style="padding:12px 18px 16px 18px; display:flex; justify-content:space-between; align-items:center;">
                                 <div>
                                     <div style="font-size:10.5px; color:#64748b;">电子验票凭证码</div>
-                                    <div style="font-size:15px; font-weight:900; color:${isGray?'#94a3b8':'#0f172a'}; font-family:monospace; letter-spacing:1.5px; margin-top:2px; ${isGray?'text-decoration:line-through;':''}">${verifyCode}</div>
+                                    <div style="font-size:15px; font-weight:900; color:${isGray?'#94a3b8':'#0f172a'}; font-family:monospace; letter-spacing:1.5px; margin-top:2px; ${isGray?'text-decoration:line-through;':''}">${liveState.code === 'unpaid' ? '待完成支付后生成' : verifyCode}</div>
                                 </div>
-                                <div style="display:flex; align-items:center; gap:3px; opacity:${isGray?0.35:0.85};">
+                                <div style="display:flex; align-items:center; gap:3px; opacity:${isGray || liveState.code === 'unpaid' ? 0.3 : 0.85};">
                                     <div style="width:3px; height:26px; background:#0f172a;"></div>
                                     <div style="width:1.5px; height:26px; background:#0f172a;"></div>
                                     <div style="width:4px; height:26px; background:#0f172a;"></div>
@@ -27148,10 +27217,8 @@ Rules:
                             </div>
                         </div>
 
-                        <!-- 3. 当时生成的项目详情快照（景点介绍 / 酒店详情 / 跟团游完整明细） -->
                         ${snapshotDetailHtml}
 
-                        <!-- 4. 支付与退改规则账单卡 -->
                         <div style="background:#ffffff; border-radius:18px; padding:16px; font-size:12px; color:#475569; line-height:1.75; box-shadow:0 2px 12px rgba(0,0,0,0.025); flex-shrink:0;">
                             <div style="font-size:13.5px; font-weight:900; color:#0f172a; margin-bottom:6px;">账单与退改说明</div>
                             <div style="display:flex; justify-content:space-between;"><span>订单编号</span><span style="font-family:monospace; color:#0f172a;">${ord.id}</span></div>
@@ -27162,16 +27229,16 @@ Rules:
                             </div>
                         </div>
 
-                        <!-- 5. 底部操作按钮区 -->
                         ${liveState.code === 'paid' ? `
                             <div style="display:flex; gap:10px; margin-top:4px; flex-shrink:0;">
-                                <button onclick="window.TravelApp.switchTab('itinerary'); document.getElementById('trv-subpage-order-detail').classList.remove('show');" style="flex:1; padding:13px; border-radius:14px; border:none; background:linear-gradient(135deg, #0066ff 0%, #0052cc 100%); color:#fff; font-size:13.5px; font-weight:800; cursor:pointer; box-shadow:0 4px 12px rgba(0,102,255,0.25);">前往行程检票互动</button>
+                                <button onclick="window.TravelApp._openedFromWeChat=false; window.TravelApp.switchTab('itinerary'); document.getElementById('trv-subpage-order-detail').classList.remove('show');" style="flex:1; padding:13px; border-radius:14px; border:none; background:linear-gradient(135deg, #0066ff 0%, #0052cc 100%); color:#fff; font-size:13.5px; font-weight:800; cursor:pointer; box-shadow:0 4px 12px rgba(0,102,255,0.25);">前往行程检票互动</button>
                                 <button onclick="window.TravelApp.promptRefundOrder('${ord.id}')" style="flex:1; padding:13px; border-radius:14px; border:1px solid #ff3b30; background:#fff5f5; color:#ff3b30; font-size:13.5px; font-weight:800; cursor:pointer;">申请退票退款</button>
                             </div>
                         ` : (liveState.code === 'unpaid' ? `
-                            <div style="display:flex; gap:10px; margin-top:4px; flex-shrink:0;">
-                                <button onclick="window.TravelApp.openShareModal('daifu')" style="flex:1; padding:13px; border-radius:14px; border:none; background:#ff9500; color:#fff; font-size:13.5px; font-weight:800; cursor:pointer;">再次发送好友代付</button>
-                                <button onclick="window.TravelApp.promptRefundOrder('${ord.id}')" style="flex:1; padding:13px; border-radius:14px; border:1px solid #cbd5e1; background:#fff; color:#475569; font-size:13.5px; font-weight:800; cursor:pointer;">取消订单</button>
+                            <div style="display:flex; gap:8px; margin-top:4px; flex-shrink:0;">
+                                <button onclick="window.TravelApp.openShareModal('daifu')" style="flex:1; padding:12px 8px; border-radius:14px; border:none; background:#ff9500; color:#fff; font-size:12.5px; font-weight:800; cursor:pointer;">邀请好友代付</button>
+                                <button onclick="window.TravelApp.payUnpaidOrderBySelf('${ord.id}')" style="flex:1; padding:12px 8px; border-radius:14px; border:none; background:#0066ff; color:#fff; font-size:12.5px; font-weight:800; cursor:pointer;">自己支付</button>
+                                <button onclick="window.TravelApp.promptRefundOrder('${ord.id}')" style="padding:12px 12px; border-radius:14px; border:1px solid #cbd5e1; background:#fff; color:#475569; font-size:12.5px; font-weight:800; cursor:pointer;">取消</button>
                             </div>
                         ` : '')}`;
 
@@ -27226,7 +27293,6 @@ Rules:
                     );
                 },
 
-                // ==================== 面具切换、设置动态说明与聊天分享/角色代付接口 ====================
                 openUserSwitchModal: function() {
                     const listEl = document.getElementById('trv-user-switch-list');
                     const users = appData.settings.userList || [];
@@ -27284,7 +27350,6 @@ Rules:
                     document.getElementById('trv-subpage-settings').classList.add('show');
                 },
 
-                // 切换设置项时，下方注释小字随之动态切换，绝不混写在一起
                 setSettingVal: function(key, val) {
                     appData.travel.settings[key] = val;
                     if (key === 'apiEngine') {
@@ -27346,20 +27411,19 @@ Rules:
                     }, true);
                 },
 
-                // 统一改为“选择聊天好友”，同时拉取现有聊天窗口与全部角色卡列表（确保代付和分享100%可选中任意角色）
+                // 打开微信聊天好友选择弹窗（支持 daifu / order / detail / list 四种卡片分享）
                 openShareModal: async function(shareType = 'detail') {
                     if (window.ensurePartitionLoaded) await window.ensurePartitionLoaded('chats');
                     this._pendingShareType = shareType;
                     const titleEl = document.getElementById('trv-share-wx-title');
                     if (titleEl) {
-                        titleEl.innerText = shareType === 'daifu' ? '选择聊天好友帮你代付' : '选择聊天好友分享';
+                        titleEl.innerText = shareType === 'daifu' ? '选择聊天好友帮你代付' : '选择聊天好友分享卡片';
                     }
 
                     const listEl = document.getElementById('trv-share-wx-list');
                     const chats = appData.chats || [];
                     const charCards = (appData.charCards || []).filter(c => !c.isNPC);
 
-                    // 构建统一的目标列表：优先展示全部角色卡及单聊/群聊会话
                     const targets = [];
                     const coveredCharIds = new Set();
 
@@ -27383,7 +27447,6 @@ Rules:
                         });
                     });
 
-                    // 将尚未建立聊天窗口的角色卡也一并拉取出来供选择
                     charCards.forEach(ch => {
                         if (!coveredCharIds.has(String(ch.id))) {
                             targets.push({
@@ -27408,7 +27471,7 @@ Rules:
                                         <div style="font-size:10.5px; color:#64748b;">${t.sub}</div>
                                     </div>
                                 </div>
-                                <span style="padding:5px 12px; border-radius:10px; background:#0066ff; color:#fff; font-size:12px; font-weight:800;">${shareType === 'daifu' ? '请TA代付' : '发送'}</span>
+                                <span style="padding:5px 12px; border-radius:10px; background:#0066ff; color:#fff; font-size:12px; font-weight:800;">${shareType === 'daifu' ? '发送代付' : '发送卡片'}</span>
                             </div>
                         `).join('');
                     }
@@ -27418,6 +27481,7 @@ Rules:
                     }
                 },
 
+                // 确认发送高定旅行卡片至微信聊天窗口（代付请求卡片保持 unpaid 状态，交由微信内的 AI 角色决定代付或暂不代付）
                 confirmShareToChat: async function(targetType, targetId) {
                     document.getElementById('trv-modal-share-wx').style.display = 'none';
                     if (window.ensurePartitionLoaded) await window.ensurePartitionLoaded('chats');
@@ -27427,20 +27491,19 @@ Rules:
                     if (targetType === 'chat') {
                         chat = appData.chats.find(c => String(c.id) === String(targetId));
                     } else {
-                        // 若选中的是尚未创建会话的角色卡，自动找到或新建与该角色的单聊会话
                         chat = appData.chats.find(c => c.type === 'single' && c.targetIds && String(c.targetIds[0]) === String(targetId));
                         if (!chat) {
                             const ch = (appData.charCards || []).find(x => String(x.id) === String(targetId));
                             if (ch) {
                                 chat = {
-                                    id: 'chat_' + Date.now(),
+                                    id: 'wx_' + Date.now(),
                                     type: 'single',
                                     name: ch.name,
                                     nickname: ch.name,
                                     avatar: ch.avatar || '',
                                     avatarThumb: ch.avatarThumb || '',
                                     targetIds: [ch.id],
-                                    userId: this.getCurrentUserId(),
+                                    settings: { linkedUser: this.getCurrentUserId() },
                                     messages: []
                                 };
                                 appData.chats.unshift(chat);
@@ -27452,58 +27515,77 @@ Rules:
                     if (!chat.messages) chat.messages = [];
 
                     const friendName = chat.nickname || chat.name || '聊天好友';
-                    let shareTxt = '';
+                    const uObj = this.getCurrentUserObj();
+                    const shareMode = this._pendingShareType || 'detail';
 
-                    if (this._pendingShareType === 'daifu' && this.activeOrderObj) {
+                    if (shareMode === 'daifu' && this.activeOrderObj) {
                         const ord = this.activeOrderObj;
-                        shareTxt = `[旅行代付邀请] 我预订了前往${ord.city}的「${ord.title}」（${ord.subTitle}），应付总额 ¥${ord.totalPaid}，可以帮我代付这张旅行订单吗？`;
-
                         chat.messages.push({
-                            id: 'msg_trv_df_' + Date.now(),
+                            id: 'wx_trvord_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
                             isUser: true,
-                            type: 'text',
-                            zh: shareTxt,
-                            body: shareTxt,
+                            type: 'trv_order_card',
+                            shareKind: 'daifu',
+                            trvUserId: this.getCurrentUserId(),
+                            orderId: ord.id,
+                            senderName: uObj.name || 'User',
+                            snapshotOrder: JSON.parse(JSON.stringify(ord)),
                             ts: Date.now()
                         });
-
-                        // 模拟角色好友收到代付请求后爽快完成代付并自动出票
-                        ord.status = 'paid';
-                        ord.payMethod = `由 ${friendName} 代付`;
-                        this.pushNotice(`好友代付成功 · ${ord.title}`, `聊天好友「${friendName}」已为您支付 ¥${ord.totalPaid}，订单现已正式出票生效！`, ord.id, false);
-                        this.save();
                         saveChatData();
-
-                        if (this.currentTab === 'me') this.renderMeTab();
-                        if (document.getElementById('trv-subpage-order-detail').classList.contains('show')) {
-                            this.openOrderDetailById(ord.id);
-                        }
-
+                        this.save();
+                        this.openOrderDetailById(ord.id, false);
                         return this.showDialog(
-                            '已发送至聊天并完成代付',
-                            `代付邀请已发送至「${friendName}」的聊天窗口，对方已欣然为您完成支付（¥${ord.totalPaid}），订单现已变更为「已出票」状态！`,
-                            () => {
-                                this.switchTab('itinerary');
-                            }
+                            '代付卡片已发送',
+                            `已将 ¥${ord.totalPaid} 的「${ord.title}」代付请求发送给「${friendName}」！\n\n前往聊天让TA回复即可决定是否为你买单；你也可以随时在订单详情页自己支付`
                         );
-                    } else if (this._pendingShareType === 'order' && this.activeOrderObj) {
-                        shareTxt = `[旅行订单分享] ${this.activeOrderObj.title} · ${this.activeOrderObj.subTitle}（出行日期：${this.activeOrderObj.dateStr}）`;
-                    } else if (this.activeItemObj) {
-                        shareTxt = `[旅行卡片分享] ${this.activeItemObj.name} · ${this.activeItemObj.slogan || this.activeItemObj.quote || this.activeItemObj.address || ''}`;
-                    } else {
-                        shareTxt = `[旅行目的地分享] 一起去「${appData.travel.currentDestination}」旅行吧！`;
+                    } else if (shareMode === 'order' && this.activeOrderObj) {
+                        const ord = this.activeOrderObj;
+                        const kind = ord.status === 'unpaid' ? 'daifu' : 'order_share';
+                        chat.messages.push({
+                            id: 'wx_trvord_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+                            isUser: true,
+                            type: 'trv_order_card',
+                            shareKind: kind,
+                            trvUserId: this.getCurrentUserId(),
+                            orderId: ord.id,
+                            senderName: uObj.name || 'User',
+                            snapshotOrder: JSON.parse(JSON.stringify(ord)),
+                            ts: Date.now()
+                        });
+                    } else if (shareMode === 'detail' && this.activeItemObj) {
+                        const it = this.activeItemObj;
+                        chat.messages.push({
+                            id: 'wx_trvitem_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+                            isUser: true,
+                            type: 'trv_item_share',
+                            itemMode: this.currentListMode || 'scenic',
+                            city: it.city || appData.travel.currentDestination || '杭州',
+                            snapshotItem: JSON.parse(JSON.stringify(it)),
+                            ts: Date.now()
+                        });
+                    } else if (shareMode === 'list') {
+                        const mode = this.currentListMode || 'hotel';
+                        const pageTitle = document.getElementById('trv-list-page-title')?.innerText || `${appData.travel.currentDestination || '精选'}旅行列表`;
+                        let rawList = [];
+                        if (mode === 'flight') rawList = this._currentFlightsList || [];
+                        else if (mode === 'train') rawList = this._currentTrainsList || [];
+                        else rawList = this._currentRenderedList || [];
+
+                        chat.messages.push({
+                            id: 'wx_trvlist_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+                            isUser: true,
+                            type: 'trv_list_share',
+                            listMode: mode,
+                            listTitle: pageTitle,
+                            city: appData.travel.currentDestination || '杭州',
+                            snapshotList: JSON.parse(JSON.stringify(rawList.slice(0, 8))),
+                            ts: Date.now()
+                        });
                     }
 
-                    chat.messages.push({
-                        id: 'msg_trv_' + Date.now(),
-                        isUser: true,
-                        type: 'text',
-                        zh: shareTxt,
-                        body: shareTxt,
-                        ts: Date.now()
-                    });
                     saveChatData();
-                    this.showDialog('已发送至聊天', `分享内容已成功发送至「${friendName}」的聊天窗口！`);
+                    this.save();
+                    this.showDialog('卡片已发送至聊天', `已成功发送至「${friendName}」的聊天窗口！\n前往聊天点击卡片即可查看详情或与好友讨论`);
                 }
             };
         </script>
@@ -54766,6 +54848,14 @@ ${modelReply}
                         else if(lastMsg.type==='voice_msg') msgText='[语音]';
                         else if(lastMsg.type==='xj_chat_share') msgText=`[闲集会话: ${lastMsg.goodTitle || '闲置沟通'}]`;
                         else if(lastMsg.type==='xj_order_share') msgText=`[闲集订单: ${(lastMsg.snapshotOrder && lastMsg.snapshotOrder.good && lastMsg.snapshotOrder.good.title) || '闲置交易'}]`;
+                        else if(lastMsg.type==='trv_order_card') {
+                            const trvOrd = this.getLiveTravelOrder(lastMsg);
+                            msgText = (lastMsg.shareKind === 'daifu' && trvOrd && trvOrd.status === 'unpaid')
+                                ? `[旅行代付请求: ${(trvOrd && trvOrd.title) || '出行订单'}]`
+                                : `[旅行订单: ${(trvOrd && trvOrd.title) || '出行凭证'}]`;
+                        }
+                        else if(lastMsg.type==='trv_item_share') msgText=`[旅行推荐: ${(lastMsg.snapshotItem && lastMsg.snapshotItem.name) || '精选目的地'}]`;
+                        else if(lastMsg.type==='trv_list_share') msgText=`[旅行清单: ${lastMsg.listTitle || '出行方案'}]`;
                         else msgText=lastMsg.zh || lastMsg.body || '[系统]';
                     }
                     const timeText = lastMsg ? this.formatMsgTime(lastMsg.ts) : '';
@@ -55241,32 +55331,37 @@ ${modelReply}
                     } else {
                         bodyHtml = `<div style="background:#fff; border-radius:8px; padding:12px; width:220px; border: 0.5px solid #efefef; color:#8e8e8e; font-size:13px; text-align:center;">该帖子已被删除</div>`;
                     }
-                } else if (msg.type === 'xj_chat_share') {
+                 } else if (msg.type === 'xj_chat_share') {
                     const liveChat = this.getLiveXjChat(msg);
                     const myName = msg.myName || uInfo.name || '我';
                     const partnerName = liveChat ? liveChat.partnerName : (msg.partnerName || '闲集用户');
                     const rawMsgs = liveChat ? (liveChat.messages || []) : (msg.snapshotMsgs || []);
+                    const linkedGood = (window.XianJiApp && liveChat && liveChat.goodId) ? window.XianJiApp.findGoodById(liveChat.goodId) : null;
+                    const gTitle = (linkedGood && linkedGood.title) || msg.goodTitle || '闲置宝贝';
+                    const gEmoji = (linkedGood && linkedGood.emoji) || msg.goodEmoji || '🛍️';
+                    const gImgUrl = (linkedGood && linkedGood.imageUrl) || msg.goodImageUrl || (window.XianJiApp ? window.XianJiApp.buildGoodImageUrl(gTitle, idx) : '');
+                    const gThumbHtml = this.buildCroppedThumbBox(gImgUrl, gEmoji, 40, 8, 20);
+
                     const previewLines = rawMsgs.filter(m => m.type === 'text' || m.type === 'price_card' || m.type === 'paid_card').slice(-3).map(m => {
                         if (m.type === 'price_card') return `<span style="color:#ff9500;font-weight:600;">[改价为 ¥${m.newPrice}]</span>`;
                         if (m.type === 'paid_card') return `<span style="color:#07c160;font-weight:600;">[已拍下付款 ¥${m.amount}]</span>`;
                         const isMe = m.from === 'me';
                         const sName = isMe ? myName : (m.sender || partnerName);
-                        // 仅过滤对方历史消息末尾的句号，用户发的消息保持原样
                         const displayText = isMe ? (m.text || '') : String(m.text || '').replace(/[。．.]+$/g, '').trim();
                         return `<b style="color:#111;">${sName}:</b> ${displayText}`;
                     }).join('<br>') || '暂无对话内容';
 
-                    bodyHtml = `<div style="background:#ffffff; border-radius:16px; width:236px; border:1px solid rgba(0,0,0,0.08); overflow:hidden; cursor:pointer; display:flex; flex-direction:column; text-align:left;" onclick="WeChatSys.openXjChatShareDetail(${idx}, event)">
+                    bodyHtml = `<div style="background:#ffffff; border-radius:16px; width:238px; border:1px solid rgba(0,0,0,0.08); overflow:hidden; cursor:pointer; display:flex; flex-direction:column; text-align:left; box-shadow:0 4px 14px rgba(0,0,0,0.03);" onclick="WeChatSys.openXjChatShareDetail(${idx}, event)">
                         <div style="background:#1c1c1e; padding:9px 12px; display:flex; align-items:center; gap:6px;">
                             <span style="background:#ffda00; color:#111; font-size:9.5px; font-weight:900; padding:1.5px 5px; border-radius:4px;">闲集</span>
-                            <span style="color:#ffffff; font-size:12px; font-weight:700;">会话记录</span>
+                            <span style="color:#ffffff; font-size:12px; font-weight:700;">会话实录</span>
                         </div>
                         <div style="padding:11px 12px; display:flex; flex-direction:column; gap:8px;">
-                            <div style="display:flex; align-items:center; gap:8px; background:#f8f9fa; padding:6px 8px; border-radius:8px; border:0.5px solid #ececef;">
-                                <span style="font-size:20px;">${msg.goodEmoji || '🛍️'}</span>
+                            <div style="display:flex; align-items:center; gap:9px; background:#f8f9fa; padding:6px 8px; border-radius:10px; border:0.5px solid #ececef;">
+                                ${gThumbHtml}
                                 <div style="flex:1; min-width:0;">
-                                    <div style="font-size:11.5px; font-weight:700; color:#111; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${msg.goodTitle || '闲置宝贝'}</div>
-                                    <div style="font-size:11px; font-weight:800; color:#ff3b30;">¥${parseFloat(msg.goodPrice || 0).toFixed(2)}</div>
+                                    <div style="font-size:12px; font-weight:700; color:#111; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${gTitle}</div>
+                                    <div style="font-size:12px; font-weight:800; color:#ff3b30; margin-top:2px; font-family:monospace;">¥${parseFloat(msg.goodPrice || 0).toFixed(2)}</div>
                                 </div>
                             </div>
                             <div style="font-size:11.5px; font-weight:700; color:#333;">${myName} 与 ${partnerName} 的对话</div>
@@ -55283,6 +55378,8 @@ ${modelReply}
                         const isSold = ord.type === 'sold';
                         const badgeTitle = isSold ? '我卖出的宝贝' : '我买到的宝贝';
                         const stg = ord.stageIndex || 0;
+                        const gImgUrl = ord.good.imageUrl || (window.XianJiApp ? window.XianJiApp.buildGoodImageUrl(ord.good.title, idx) : '');
+                        const gThumbHtml = this.buildCroppedThumbBox(gImgUrl, ord.good.emoji || '🛍️', 46, 10, 24);
 
                         const mainStatusTitle = stg === 0 ? (isSold ? '买家已付款 · 待发货' : '已付款 · 等待卖家发货')
                             : (stg === 1 ? '卖家已发货 · 待揽收'
@@ -55305,14 +55402,14 @@ ${modelReply}
                                 ? `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#111111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>`
                                 : `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#ff9500" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>`);
 
-                        bodyHtml = `<div style="background:#ffffff; border-radius:16px; width:236px; border:1px solid rgba(0,0,0,0.08); overflow:hidden; cursor:pointer; display:flex; flex-direction:column; text-align:left;" onclick="WeChatSys.openXjOrderShareDetail(${idx}, event)">
+                        bodyHtml = `<div style="background:#ffffff; border-radius:16px; width:238px; border:1px solid rgba(0,0,0,0.08); overflow:hidden; cursor:pointer; display:flex; flex-direction:column; text-align:left; box-shadow:0 4px 14px rgba(0,0,0,0.03);" onclick="WeChatSys.openXjOrderShareDetail(${idx}, event)">
                             <div style="background:#ffda00; padding:8px 12px; display:flex; align-items:center; gap:6px;">
                                 <span style="background:#111; color:#ffda00; font-size:9.5px; font-weight:900; padding:1.5px 5px; border-radius:4px;">闲集</span>
                                 <span style="color:#111; font-size:12px; font-weight:800;">${badgeTitle}</span>
                             </div>
                             <div style="padding:11px 12px; display:flex; flex-direction:column; gap:10px;">
                                 <div style="display:flex; gap:10px; align-items:center;">
-                                    <div style="width:44px; height:44px; border-radius:10px; background:#f8f9fa; display:flex; align-items:center; justify-content:center; font-size:24px; flex-shrink:0; border:0.5px solid #ececef;">${ord.good.emoji || '🛍️'}</div>
+                                    ${gThumbHtml}
                                     <div style="flex:1; min-width:0;">
                                         <div style="font-size:12.5px; font-weight:800; color:#111; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${ord.good.title}</div>
                                         <div style="margin-top:4px; display:flex; align-items:baseline;">
@@ -55399,26 +55496,35 @@ ${modelReply}
                                 ? `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#07c160" stroke-width="2.4"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`
                                 : `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#ff6b00" stroke-width="2.1"><path d="M12 3a8 8 0 0 0-8 8h16a8 8 0 0 0-8-8z"></path><line x1="2" y1="14" x2="22" y2="14"></line><path d="M5 14l1.5 5h11L19 14"></path></svg>`);
 
-                        const logoBoxHtml = window.WaimaiApp ? window.WaimaiApp.buildStoreLogoHtml(ord.storeName, 40, false) : '';
+                        const logoBoxHtml = window.WaimaiApp ? window.WaimaiApp.buildStoreLogoHtml(ord.storeName, 38, false) : '';
+                        // 严格只截取前 2 个商品配图展示，排版更充裕整洁
+                        const foodItemsHtml = (ord.items || []).slice(0, 2).map((it, fIdx) => {
+                            const fUrl = it.imageUrl || (window.WaimaiApp ? window.WaimaiApp.buildFoodImageUrl(it.name, ['food'], fIdx) : '');
+                            return `<div style="display:flex; align-items:center; gap:6px; background:#f8f9fa; padding:4px 7px; border-radius:7px; flex:1; min-width:0;">
+                                ${this.buildCroppedThumbBox(fUrl, it.emoji || '🍱', 26, 5, 14)}
+                                <span style="font-size:10.5px; font-weight:700; color:#222; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${it.name}</span>
+                            </div>`;
+                        }).join('');
 
-                        bodyHtml = `<div style="background:#ffffff; border-radius:16px; width:242px; border:1px solid rgba(0,0,0,0.08); overflow:hidden; cursor:pointer; display:flex; flex-direction:column; text-align:left; box-shadow:0 4px 14px rgba(0,0,0,0.03);" onclick="WeChatSys.openWaimaiOrderCardDetail('${ord.id}', event)">
+                        bodyHtml = `<div style="background:#ffffff; border-radius:16px; width:244px; border:1px solid rgba(0,0,0,0.08); overflow:hidden; cursor:pointer; display:flex; flex-direction:column; text-align:left; box-shadow:0 4px 14px rgba(0,0,0,0.03);" onclick="WeChatSys.openWaimaiOrderCardDetail('${ord.id}', event)">
                             <div style="background:${headerBg}; padding:8px 12px; display:flex; align-items:center; justify-content:space-between;">
                                 <div style="display:flex; align-items:center; gap:6px;">
                                     <span style="background:${tagBg}; color:${tagColor}; font-size:9.5px; font-weight:900; padding:1.5px 5px; border-radius:4px;">外卖</span>
                                     <span style="color:${headerTextColor}; font-size:12px; font-weight:800;">${headerTitle}</span>
                                 </div>
                             </div>
-                            <div style="padding:11px 12px; display:flex; flex-direction:column; gap:9px;">
-                                <div style="display:flex; gap:10px; align-items:center; border-bottom:0.5px solid #f2f2f5; padding-bottom:8px;">
+                            <div style="padding:11px 12px; display:flex; flex-direction:column; gap:8px;">
+                                <div style="display:flex; gap:9px; align-items:center;">
                                     ${logoBoxHtml}
                                     <div style="flex:1; min-width:0;">
                                         <div style="font-size:13px; font-weight:800; color:#111; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${ord.storeName}</div>
-                                        <div style="margin-top:3px; display:flex; align-items:baseline; justify-content:space-between;">
-                                            <span style="font-size:10.5px; color:#8e8e93;">${isUnpaid ? '待付金额' : '实付总计'}</span>
+                                        <div style="margin-top:2px; display:flex; align-items:baseline; justify-content:space-between;">
+                                            <span style="font-size:10.5px; color:#8e8e93;">共 ${(ord.items||[]).length} 件餐品</span>
                                             <span style="font-size:14.5px; font-weight:900; color:#ff3b30; font-family:-apple-system, BlinkMacSystemFont, monospace;">¥${parseFloat(ord.totalPaid || 0).toFixed(2)}</span>
                                         </div>
                                     </div>
                                 </div>
+                                ${foodItemsHtml ? `<div style="display:flex; gap:5px; overflow:hidden;">${foodItemsHtml}</div>` : ''}
                                 <div style="background:${isUnpaid?'#fff5f5':'#f7f8fa'}; border-radius:10px; padding:8px 10px; display:flex; align-items:center; gap:8px; border:0.5px solid ${isUnpaid?'rgba(255,59,48,0.2)':'#efefef'};">
                                     <div style="width:28px; height:28px; border-radius:8px; background:#ffffff; display:flex; align-items:center; justify-content:center; flex-shrink:0; box-shadow:0 1px 3px rgba(0,0,0,0.04);">
                                         ${statusIconSvg}
@@ -55430,7 +55536,7 @@ ${modelReply}
                                     <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#b3b3b3" stroke-width="2.2" style="flex-shrink:0;"><polyline points="9 18 15 12 9 6"></polyline></svg>
                                 </div>
                                 <div style="border-top:0.5px dashed #ececef; padding-top:6px; display:flex; justify-content:space-between; align-items:center; font-size:10px; color:#8e8e93;">
-                                    <span>${isUnpaid ? '等待付款' : '订单状态实时同步'}</span>
+                                    <span>${isUnpaid ? '等待好友付款' : '配送状态实时同步'}</span>
                                     <span style="color:#111; font-weight:700;">查看详情 ›</span>
                                 </div>
                             </div>
@@ -55441,8 +55547,17 @@ ${modelReply}
                 } else if (msg.type === 'wm_store_share') {
                     const st = (window.WaimaiApp && window.WaimaiApp.findStoreById(msg.storeId)) || msg.snapshotStore;
                     if (st) {
-                        const logoHtml = window.WaimaiApp ? window.WaimaiApp.buildStoreLogoHtml(st.name, 42, false) : '';
-                        bodyHtml = `<div style="background:#ffffff; border-radius:16px; width:236px; border:1px solid rgba(0,0,0,0.08); overflow:hidden; cursor:pointer; display:flex; flex-direction:column; text-align:left;" onclick="WeChatSys.openWaimaiStoreShareDetail('${st.id}', event)">
+                        const logoHtml = window.WaimaiApp ? window.WaimaiApp.buildStoreLogoHtml(st.name, 40, false) : '';
+                        const topFoods = (st.menuCategories && st.menuCategories[0] && st.menuCategories[0].foods) ? st.menuCategories[0].foods.slice(0, 3) : [];
+                        const foodsStripHtml = topFoods.map((f, fIdx) => {
+                            const fUrl = f.imageUrl || (window.WaimaiApp ? window.WaimaiApp.buildFoodImageUrl(f.name, st.cats || ['food'], fIdx) : '');
+                            return `<div style="flex:1; min-width:0; display:flex; flex-direction:column; align-items:center; background:#f8f9fa; padding:5px 4px; border-radius:8px;">
+                                ${this.buildCroppedThumbBox(fUrl, f.emoji || '🍱', 38, 6, 18)}
+                                <span style="font-size:10px; font-weight:700; color:#222; margin-top:4px; width:100%; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${f.name}</span>
+                            </div>`;
+                        }).join('');
+
+                        bodyHtml = `<div style="background:#ffffff; border-radius:16px; width:240px; border:1px solid rgba(0,0,0,0.08); overflow:hidden; cursor:pointer; display:flex; flex-direction:column; text-align:left; box-shadow:0 4px 14px rgba(0,0,0,0.03);" onclick="WeChatSys.openWaimaiStoreShareDetail('${st.id}', event)">
                             <div style="background:#ffd100; padding:8px 12px; display:flex; align-items:center; gap:6px;">
                                 <span style="background:#111; color:#ffd100; font-size:9.5px; font-weight:900; padding:1.5px 5px; border-radius:4px;">外卖</span>
                                 <span style="color:#111; font-size:12px; font-weight:800;">好店推荐</span>
@@ -55452,12 +55567,12 @@ ${modelReply}
                                     ${logoHtml}
                                     <div style="flex:1; min-width:0;">
                                         <div style="font-size:13px; font-weight:800; color:#111; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${st.name}</div>
-                                        <div style="font-size:11px; color:#ff6b00; font-weight:700; margin-top:3px;">★ ${st.score} · 月售${st.monthlySales}+</div>
+                                        <div style="font-size:11px; color:#ff6b00; font-weight:700; margin-top:3px;">★ ${st.score} · 月售${st.monthlySales}+ · ${st.distance}</div>
                                     </div>
                                 </div>
-                                <div style="font-size:11px; color:#666; background:#f8f9fa; padding:6px 8px; border-radius:8px;">起送¥${st.minOrder} · 约${st.deliveryMins}分钟送达 (${st.distance})</div>
+                                ${foodsStripHtml ? `<div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px;">${foodsStripHtml}</div>` : ''}
                                 <div style="border-top:0.5px dashed #ececef; padding-top:6px; display:flex; justify-content:space-between; align-items:center; font-size:10px; color:#8e8e93;">
-                                    <span>外卖品质专送</span>
+                                    <span>起送¥${st.minOrder} · 约${st.deliveryMins}分钟</span>
                                     <span style="color:#111; font-weight:700;">进店点餐 ›</span>
                                 </div>
                             </div>
@@ -55465,8 +55580,130 @@ ${modelReply}
                     } else {
                         bodyHtml = `<div style="background:#fff; border-radius:12px; padding:12px; width:220px; border:0.5px solid #efefef; color:#8e8e8e; font-size:12px; text-align:center;">该店铺已下架</div>`;
                     }
+                } else if (msg.type === 'trv_order_card') {
+                    const ord = this.getLiveTravelOrder(msg);
+                    if (ord) {
+                        const liveState = (window.TravelApp && window.TravelApp.computeOrderLiveState) ? window.TravelApp.computeOrderLiveState(ord) : { code: ord.status || 'paid', label: ord.status === 'unpaid' ? '待代付' : '已出票', color: '#0066ff' };
+                        const isUnpaid = liveState.code === 'unpaid';
+                        const isDaifu = msg.shareKind === 'daifu';
+                        const snap = ord.rawSnapshot || {};
+                        const coverImg = snap.imageUrl || '';
+
+                        const typeLabelMap = { hotel: '酒店住宿', flight: '机票航班', train: '高铁火车', scenic: '景区门票', tour: '定制跟团' };
+                        const typeName = typeLabelMap[ord.orderType] || '出行凭证';
+
+                        const headerBg = isUnpaid
+                            ? 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)'
+                            : 'linear-gradient(135deg, #0066ff 0%, #0284c7 100%)';
+
+                        const headerTitle = isDaifu
+                            ? (isUnpaid ? '旅行订单代付邀请' : `已由 ${ord.payerName || '好友'} 完成代付`)
+                            : `${typeName} · 电子订单`;
+
+                        const subStatusTxt = isUnpaid
+                            ? (ord.daifuRejectedBy ? `${ord.daifuRejectedBy}暂未代付 · 仍待付款` : `出行人：${(ord.passengers||[]).join('、')}`)
+                            : `${ord.dateStr} · 出行人：${(ord.passengers||[]).join('、')}`;
+
+                        const mediaPreviewHtml = coverImg ? `
+                            <div style="display:flex; gap:10px; align-items:center;">
+                                ${this.buildCroppedThumbBox(coverImg, '', 48, 10, 20)}
+                                <div style="flex:1; min-width:0;">
+                                    <div style="font-size:13px; font-weight:900; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${ord.title}</div>
+                                    <div style="font-size:11px; color:#64748b; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${ord.subTitle}</div>
+                                </div>
+                            </div>` : `
+                            <div style="background:#f8fafc; border-radius:10px; padding:9px 10px; border:0.5px solid #e2e8f0;">
+                                <div style="font-size:13px; font-weight:900; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${ord.title}</div>
+                                <div style="font-size:11px; color:#0066ff; font-weight:700; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${ord.subTitle}</div>
+                                ${(ord.seatAllocations && ord.seatAllocations.length) ? `<div style="font-size:10.5px; color:#16a34a; font-weight:800; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">席位：${ord.seatAllocations.join(' ')}</div>` : ''}
+                            </div>`;
+
+                        bodyHtml = `<div style="background:#ffffff; border-radius:16px; width:246px; border:1px solid rgba(0,0,0,0.08); overflow:hidden; cursor:pointer; display:flex; flex-direction:column; text-align:left; box-shadow:0 6px 18px rgba(15,23,42,0.05);" onclick="WeChatSys.openTravelOrderCardDetail('${ord.id}', event)">
+                            <div style="background:${headerBg}; padding:9px 12px; display:flex; align-items:center; justify-content:space-between;">
+                                <div style="display:flex; align-items:center; gap:6px;">
+                                    <span style="background:#38bdf8; color:#0f172a; font-size:9.5px; font-weight:900; padding:1.5px 5px; border-radius:4px;">旅行</span>
+                                    <span style="color:#ffffff; font-size:12px; font-weight:800;">${headerTitle}</span>
+                                </div>
+                                <span style="font-size:10.5px; font-weight:800; color:${isUnpaid?'#fbbf24':'#ffffff'};">${liveState.label}</span>
+                            </div>
+                            <div style="padding:11px 12px; display:flex; flex-direction:column; gap:9px;">
+                                ${mediaPreviewHtml}
+                                <div style="display:flex; justify-content:space-between; align-items:baseline; padding:6px 10px; background:${isUnpaid?'#fffbeb':'#f0f9ff'}; border-radius:9px; border:0.5px solid ${isUnpaid?'#fde68a':'#bae6fd'};">
+                                    <span style="font-size:11px; font-weight:700; color:${isUnpaid?'#b45309':'#0369a1'};">${isUnpaid ? '待付总额' : '订单总额'}</span>
+                                    <span style="font-size:15.5px; font-weight:900; color:#ff3b30; font-family:monospace;">¥${ord.totalPaid}</span>
+                                </div>
+                                <div style="font-size:10.5px; color:#64748b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${subStatusTxt}</div>
+                                <div style="border-top:0.5px dashed #e2e8f0; padding-top:6px; display:flex; justify-content:space-between; align-items:center; font-size:10px; color:#94a3b8;">
+                                    <span>目的地：${ord.city || '精选'}</span>
+                                    <span style="color:#0066ff; font-weight:800;">查看订单凭证 ›</span>
+                                </div>
+                            </div>
+                        </div>`;
+                    } else {
+                        bodyHtml = `<div style="background:#fff; border-radius:12px; padding:12px; width:220px; border:0.5px solid #efefef; color:#8e8e8e; font-size:12px; text-align:center;">该旅行订单已被清理</div>`;
+                    }
+                } else if (msg.type === 'trv_item_share') {
+                    const it = msg.snapshotItem || {};
+                    const mode = msg.itemMode || 'scenic';
+                    const badgeMap = { hotel: '高星酒店', scenic: '景点门票', tour: '定制跟团' };
+                    const priceVal = it.minPrice || it.price || 180;
+                    const descTxt = it.quote || it.slogan || it.intro || (Array.isArray(it.features) ? it.features[0] : '') || it.address || '精选口碑推荐';
+                    const coverHtml = this.buildCroppedThumbBox(it.imageUrl || '', '', 246, 0, 22, 112);
+
+                    bodyHtml = `<div style="background:#ffffff; border-radius:16px; width:246px; border:1px solid rgba(0,0,0,0.08); overflow:hidden; cursor:pointer; display:flex; flex-direction:column; text-align:left; box-shadow:0 6px 18px rgba(15,23,42,0.05);" onclick="WeChatSys.openTravelItemShareDetail(${idx}, event)">
+                        <div style="position:relative; width:100%; height:112px; overflow:hidden; background:linear-gradient(135deg, #0284c7, #1e3a8a);">
+                            ${coverHtml}
+                            <span style="position:absolute; top:8px; left:8px; z-index:3; background:rgba(15,23,42,0.78); backdrop-filter:blur(4px); color:#38bdf8; font-size:10px; font-weight:800; padding:2px 7px; border-radius:6px;">旅行 · ${badgeMap[mode]||'推荐'}</span>
+                            <span style="position:absolute; bottom:8px; right:8px; z-index:3; background:rgba(255,255,255,0.95); color:#ff3b30; font-size:12px; font-weight:900; padding:2px 8px; border-radius:6px; font-family:monospace;">¥${priceVal}起</span>
+                        </div>
+                        <div style="padding:10px 12px; display:flex; flex-direction:column; gap:5px;">
+                            <div style="font-size:13.5px; font-weight:900; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${it.name || '精选旅行目的地'}</div>
+                            <div style="font-size:11px; color:#475569; line-height:1.45; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${descTxt}</div>
+                            <div style="border-top:0.5px dashed #e2e8f0; padding-top:6px; margin-top:2px; display:flex; justify-content:space-between; align-items:center; font-size:10.5px; color:#64748b;">
+                                <span style="color:#f59e0b; font-weight:800;">★ ${it.score || 4.9}分</span>
+                                <span style="color:#0066ff; font-weight:800;">点击查看详情 ›</span>
+                            </div>
+                        </div>
+                    </div>`;
+                } else if (msg.type === 'trv_list_share') {
+                    const listArr = msg.snapshotList || [];
+                    const mode = msg.listMode || 'hotel';
+                    const rowsHtml = listArr.slice(0, 3).map((item, rIdx) => {
+                        if (mode === 'flight') {
+                            return `<div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; padding:5px 8px; background:#f8fafc; border-radius:7px;">
+                                <span style="font-weight:700; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:155px;">${item.depTime}-${item.arrTime} ${item.flightNo}</span>
+                                <span style="font-weight:900; color:#ff3b30; font-family:monospace;">¥${item.price}</span>
+                            </div>`;
+                        } else if (mode === 'train') {
+                            const p = (item.seats && item.seats[0]) ? item.seats[0].price : 150;
+                            return `<div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; padding:5px 8px; background:#f8fafc; border-radius:7px;">
+                                <span style="font-weight:700; color:#0f172a;">${item.trainNo} (${item.depTime}-${item.arrTime})</span>
+                                <span style="font-weight:900; color:#ff3b30; font-family:monospace;">¥${p}起</span>
+                            </div>`;
+                        } else {
+                            const p = item.minPrice || item.price || 180;
+                            return `<div style="display:flex; align-items:center; gap:7px; padding:4px 6px; background:#f8fafc; border-radius:8px;">
+                                ${this.buildCroppedThumbBox(item.imageUrl || '', '', 30, 6, 14)}
+                                <div style="flex:1; min-width:0; font-size:11.5px; font-weight:700; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${item.name}</div>
+                                <span style="font-size:11.5px; font-weight:900; color:#ff3b30; font-family:monospace; flex-shrink:0;">¥${p}</span>
+                            </div>`;
+                        }
+                    }).join('');
+
+                    bodyHtml = `<div style="background:#ffffff; border-radius:16px; width:246px; border:1px solid rgba(0,0,0,0.08); overflow:hidden; cursor:pointer; display:flex; flex-direction:column; text-align:left; box-shadow:0 6px 18px rgba(15,23,42,0.05);" onclick="WeChatSys.openTravelListShareDetail(${idx}, event)">
+                        <div style="background:linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); padding:9px 12px; display:flex; align-items:center; gap:6px;">
+                            <span style="background:#38bdf8; color:#0f172a; font-size:9.5px; font-weight:900; padding:1.5px 5px; border-radius:4px;">旅行清单</span>
+                            <span style="color:#ffffff; font-size:12px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${msg.listTitle || '精选出行方案'}</span>
+                        </div>
+                        <div style="padding:10px 12px; display:flex; flex-direction:column; gap:6px;">
+                            ${rowsHtml || '<div style="font-size:11.5px; color:#94a3b8;">共多项精选方案</div>'}
+                            <div style="border-top:0.5px dashed #e2e8f0; padding-top:6px; margin-top:2px; display:flex; justify-content:space-between; align-items:center; font-size:10px; color:#64748b;">
+                                <span>共 ${listArr.length} 个候选方案</span>
+                                <span style="color:#0066ff; font-weight:800;">打开完整列表 ›</span>
+                            </div>
+                        </div>
+                    </div>`;
                 } else {
-                    // 仅对普通聊天气泡（非通话记录）进行去句号和省略号处理
                     let txt = msg.zh || msg.body || "";
                     let quoteTxt = msg.quote || "";
                     
@@ -55490,13 +55727,11 @@ ${modelReply}
                     }
                     let quoteHtml = quoteTxt ? `<div class="wx-quote-inner">${quoteTxt}</div>` : '';
                     
-                    // 【修复点 1】：补充被遗漏的 voiceBtn 变量定义和播放按钮逻辑
                     let voiceBtn = '';
                     if (!isUser && msg.audioUrl) {
                         voiceBtn = `<div class="wx-voice-icon" onclick="WeChatSys.playVoice('${msg.audioUrl}', this, event)"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg></div>`;
                     }
                     
-                    // 【优化】：增加 chat.settings 的判断，防止旧版本存档报错
                     let isBilingualText = chat.settings && (chat.settings.bilingualText || (chat.settings.bilingual && chat.settings.bilingualText === undefined));
                     if (isBilingualText && msg.foreign) { 
                         bodyHtml = `${quoteHtml}<div class="wx-msg-text-content">${txt}</div><div class="wx-bilingual-line"></div><div class="wx-bilingual-fg">${msg.foreign}</div>${voiceBtn}`; 
@@ -55505,10 +55740,9 @@ ${modelReply}
                     }
                 }
 
-                let multiClass = ''; // 优化：不在单行渲染时处理动画类名，交由外层容器统一接管
+                let multiClass = '';
                 let checkedClass = this.multiSelectedIdxs.includes(idx) ? 'checked' : '';
-               // 修复：确保骰子(dice)、表情包(sticker)、闲集卡片及外卖高定卡片不会带上普通气泡背景
-let isSpecialType = ['image', 'sticker', 'dice', 'redpacket', 'takeaway', 'undercover_init', 'undercover_vote', 'forward_history', 'essay_share', 'weibo_share', 'xj_chat_share', 'xj_order_share', 'wm_order_card', 'wm_store_share'].includes(msg.type);
+                let isSpecialType = ['image', 'sticker', 'dice', 'redpacket', 'takeaway', 'undercover_init', 'undercover_vote', 'forward_history', 'essay_share', 'weibo_share', 'xj_chat_share', 'xj_order_share', 'wm_order_card', 'wm_store_share', 'trv_order_card', 'trv_item_share', 'trv_list_share'].includes(msg.type);
 let specialClass = isSpecialType ? 'sticker' : '';
 
                 let nameHtml = `<div class="wx-msg-name"></div>`;
@@ -55812,9 +56046,18 @@ let specialClass = isSpecialType ? 'sticker' : '';
                     if(m.type==='wm_order_card') {
                         content = this.formatWaimaiOrderForLLM(m);
                     }
-                    if(m.type==='wm_store_share') {
+                     if(m.type==='wm_store_share') {
                         const st = (window.WaimaiApp && window.WaimaiApp.findStoreById(m.storeId)) || m.snapshotStore || {};
                         content = `[分享了外卖店铺卡片：店铺名「${st.name || '美食店'}」，评分${st.score || 4.9}分，起送¥${st.minOrder || 20}，距离${st.distance || '1.2km'}]`;
+                    }
+                    if(m.type==='trv_order_card') {
+                        content = this.formatTravelOrderForLLM(m);
+                    }
+                    if(m.type==='trv_item_share') {
+                        content = this.formatTravelItemShareForLLM(m);
+                    }
+                    if(m.type==='trv_list_share') {
+                        content = this.formatTravelListShareForLLM(m);
                     }
                     if(m.type==='vote') content = `[发起投票: ${m.title}]`;
                     if(m.type==='undercover_init') {
@@ -56038,6 +56281,11 @@ ${timeGapRule}
 4. 【配送时空红线（严禁穿帮）】：每次回复前必须仔细查看外卖卡片当前的【实时配送状态】！
    - 若状态为“待商家接单”、“商家备餐中”、“骑手赶往商家”、“骑手到店取餐”或“骑手配送中”，说明**外卖还在路上、根本没有送到**！【绝对禁止】说“已经吃上了”、“真好吃”、“刚喝了一口”、“外卖到了”等时空错乱的话！只能聊期待、叮嘱注意接电话、讨论点的菜品或看着地图上骑手的位置聊天。
    - 只有当卡片状态明确显示为【外卖已送达 · 订单已完成】时，才允许说拿到了外卖、正在吃或评价味道！
+【旅行APP卡片与代付联动规则】：
+1. 【处理 ${uName} 发来的旅行代付请求】：当历史记录中出现状态为【待代付(unpaid)】的旅行代付邀请卡片（含订单ID、目的地、机票/火车票/酒店/门票/跟团游名称、同行人、座位号及应付总额）时，请结合你的人设、财力以及同行人里有没有你来决定：
+   - 如果你同意帮 TA 支付这笔旅行订单，必须在回复中附带指令 \`[同意旅行代付:订单ID]\`（系统将自动把订单变更为已出票生效状态）。
+   - 如果你拒绝或暂时不帮 TA 代付，必须在回复中附带指令 \`[拒绝旅行代付:订单ID]\` 并按人设说明理由或调侃（订单将保持待代付状态）。
+2. 【讨论旅行分享卡片】：当 ${uName} 分享了旅行酒店、景点门票、跟团游详情卡片或候选列表清单卡片时，你可以清楚看到卡片里的评分、价格、房型/票种、每日行程路线等全部内容，请结合你们的关系与偏好自然地给出建议、挑选或讨论旅行计划。
 【红包互动】：群聊如果是发给大家抢，用 \`[发拼手气红包:总金额:红包个数:备注]\`。如果是想单独请群里特定的某个人（比如专属早餐费、给某个人的专属红包），【务必】使用 \`[发专属红包:金额:接收人名字:备注]\`，绝对不要用拼手气！单聊界面只能发专属红包，专属红包用 \`[发专属红包:金额:接收人名字:备注]\`。
 如果你还没领过且红包有剩余(剩余>0)，必须附带 \`[领红包:红包ID]\` 领取。
 **特别注意**：1.如果红包已领完(剩余为0)且明细里没有你的名字，严禁说“谢谢/收到了”，必须表达没抢到的遗憾、手速慢的抱怨或要求补发。如果是你领到了，请根据金额大小做出真实反应。【因为抢到的金额是系统即时随机计算的，你在这轮回复中绝对不要自己猜测或报出具体的金额数字，仅表达领到的喜悦即可！】2.请保持日常文字聊天，以上指令功能严禁频繁提及或使用。3.严禁主动发送语音条指令，只有当用户在对话中明确要求你发语音时才可以使用 \`${voiceCmdFormat}\` 指令`;
@@ -56623,6 +56871,48 @@ sysPrompt += `
                             historyModified = true;
                         }
                         rawStr = rawStr.replace(rejDfMatch[0], '');
+                    }
+
+                    // 4. 角色同意帮用户代付旅行订单
+                    let trvPayMatch;
+                    while ((trvPayMatch = rawStr.match(/\[(?:同意旅行代付|接受旅行代付|代付旅行)[:：]\s*([^\]]+)\]/))) {
+                        let targetOrdId = trvPayMatch[1].trim();
+                        if (window.TravelApp) {
+                            let foundTrv = window.TravelApp.findOrderGlobal(targetOrdId);
+                            if (!foundTrv) {
+                                let latestTrvMsg = chat.messages.slice().reverse().find(m => m.type === 'trv_order_card' && m.shareKind === 'daifu');
+                                if (latestTrvMsg) {
+                                    targetOrdId = latestTrvMsg.orderId;
+                                    foundTrv = window.TravelApp.findOrderGlobal(targetOrdId);
+                                }
+                            }
+                            if (foundTrv && foundTrv.order && foundTrv.order.status === 'unpaid') {
+                                window.TravelApp.activateUnpaidTravelOrder(targetOrdId, charName, `由 ${charName} 代付`);
+                                queuedMsgs.push({ isUser: false, type: 'system', body: `${charName} 已为你代付了旅行订单「${foundTrv.order.title}」(¥${foundTrv.order.totalPaid})，现已正式出票`, ts: Date.now() });
+                                historyModified = true;
+                            }
+                        }
+                        rawStr = rawStr.replace(trvPayMatch[0], '');
+                    }
+
+                    // 5. 角色拒绝/暂不代付旅行订单
+                    let trvRejMatch;
+                    while ((trvRejMatch = rawStr.match(/\[(?:拒绝旅行代付|暂不代付旅行)[:：]\s*([^\]]+)\]/))) {
+                        let targetOrdId = trvRejMatch[1].trim();
+                        if (window.TravelApp) {
+                            let foundTrv = window.TravelApp.findOrderGlobal(targetOrdId);
+                            if (!foundTrv) {
+                                let latestTrvMsg = chat.messages.slice().reverse().find(m => m.type === 'trv_order_card' && m.shareKind === 'daifu');
+                                if (latestTrvMsg) foundTrv = window.TravelApp.findOrderGlobal(latestTrvMsg.orderId);
+                            }
+                            if (foundTrv && foundTrv.order) {
+                                foundTrv.order.daifuRejectedBy = charName;
+                                window.TravelApp.save();
+                            }
+                        }
+                        queuedMsgs.push({ isUser: false, type: 'system', body: `${charName} 暂未代付你的旅行订单`, ts: Date.now() });
+                        historyModified = true;
+                        rawStr = rawStr.replace(trvRejMatch[0], '');
                     }
 
                     let accTa; while((accTa = rawStr.match(/\[接受外卖:([^\]]+)\]/))) { 
@@ -57886,7 +58176,23 @@ sysPrompt += `
             return `[分享了闲集APP的实时交易订单卡片：${tradeParties}，商品名称：「${ord.good.title}」，成交总金额：¥${parseFloat(ord.totalAmount || 0).toFixed(2)}，发货路线：从${ord.sellerCity || '发件地'}发往${ord.toCity || ''}${ord.toDistrict || ''}（收件地址：${ord.buyerAddress || ''}），当前实时订单状态：【${statusText}】，最新物流进展：${latestLog}${reviewStr}]`;
         },
 
-        // 点击微信中的「闲集会话分享卡片」展开拟真来回气泡阅读器
+        // 统一裁剪缩略图容器构建器（与闲集/外卖/旅行内部视觉一致：居中 object-fit:cover 裁剪，加载失败才回退显示 Emoji 或矢量图标）
+        buildCroppedThumbBox: function(imgUrl, fallbackEmoji = '🛍️', size = 44, radius = 10, emojiSize = 22, customHeight = null) {
+            const w = size;
+            const h = customHeight || size;
+            const fallbackContent = fallbackEmoji
+                ? `<span style="font-size:${emojiSize}px;">${fallbackEmoji}</span>`
+                : `<svg viewBox="0 0 24 24" width="${emojiSize}" height="${emojiSize}" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="1.8"><path d="m8 3 4 8 5-5 5 15H2L8 3z"></path><circle cx="17" cy="5" r="2"></circle></svg>`;
+            if (!imgUrl) {
+                return `<div style="width:${w}px; height:${h}px; border-radius:${radius}px; background:#f2f4f7; display:flex; align-items:center; justify-content:center; flex-shrink:0; border:0.5px solid rgba(0,0,0,0.06);">${fallbackContent}</div>`;
+            }
+            return `<div style="width:${w}px; height:${h}px; border-radius:${radius}px; background:#f2f4f7; display:flex; align-items:center; justify-content:center; flex-shrink:0; position:relative; overflow:hidden; border:0.5px solid rgba(0,0,0,0.06);">
+                <div style="display:none; width:100%; height:100%; align-items:center; justify-content:center;">${fallbackContent}</div>
+                <img src="${imgUrl}" decoding="async" style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block;" onerror="this.style.display='none'; if(this.previousElementSibling) this.previousElementSibling.style.display='flex';">
+            </div>`;
+        },
+
+        // 点击微信中的「闲集会话分享卡片」展开拟真来回气泡阅读器（商品头图同步裁剪显示）
         openXjChatShareDetail: function(msgIdx, event) {
             if (event) event.stopPropagation();
             const chat = appData.chats.find(c => c.id === this.currentChatId);
@@ -57897,40 +58203,43 @@ sysPrompt += `
             const myName = msg.myName || this.getUserInfo().name || '我';
             const partnerName = liveChat ? liveChat.partnerName : (msg.partnerName || '闲集用户');
             const rawMsgs = liveChat ? (liveChat.messages || []) : (msg.snapshotMsgs || []);
+            const linkedGood = (window.XianJiApp && liveChat && liveChat.goodId) ? window.XianJiApp.findGoodById(liveChat.goodId) : null;
 
             document.getElementById('wx-xj-detail-title').innerText = `${myName} 与 ${partnerName} 的闲集对话`;
             const body = document.getElementById('wx-xj-detail-body');
 
             let bubblesHtml = '';
-            rawMsgs.forEach(m => {
+            rawMsgs.forEach((m, i) => {
                 if (m.type === 'good_card') {
+                    const cTitle = m.title || (linkedGood && linkedGood.title) || msg.goodTitle || '闲置宝贝';
+                    const cEmoji = m.emoji || (linkedGood && linkedGood.emoji) || msg.goodEmoji || '🛍️';
+                    const cImgUrl = m.imageUrl || (linkedGood && linkedGood.imageUrl) || (window.XianJiApp ? window.XianJiApp.buildGoodImageUrl(cTitle, i) : '');
                     bubblesHtml += `
                     <div style="align-self:center; width:94%; background:#ffffff; border-radius:14px; padding:10px 12px; border:0.5px solid #e5e5ea; display:flex; align-items:center; gap:10px; box-shadow:0 2px 8px rgba(0,0,0,0.03);">
-                        <div style="font-size:26px; width:42px; height:42px; border-radius:10px; background:#f8f9fa; display:flex; align-items:center; justify-content:center;">${m.emoji || msg.goodEmoji || '🛍️'}</div>
+                        ${this.buildCroppedThumbBox(cImgUrl, cEmoji, 46, 10, 24)}
                         <div style="flex:1; min-width:0;">
-                            <div style="font-size:12.5px; font-weight:700; color:#111; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${m.title || msg.goodTitle}</div>
+                            <div style="font-size:12.5px; font-weight:700; color:#111; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${cTitle}</div>
                             <div style="font-size:13.5px; font-weight:800; color:#ff3b30; margin-top:2px;">¥${parseFloat(m.price || msg.goodPrice || 0).toFixed(2)}</div>
                         </div>
                     </div>`;
                 } else if (m.type === 'price_card') {
                     bubblesHtml += `
                     <div style="align-self:center; background:#fff9c4; color:#b45309; font-size:11.5px; font-weight:700; padding:6px 14px; border-radius:12px;">
-                        🏷️ 卖家已将宝贝价格调整为 ¥${parseFloat(m.newPrice).toFixed(2)}
+                        卖家已将宝贝价格调整为 ¥${parseFloat(m.newPrice).toFixed(2)}
                     </div>`;
                 } else if (m.type === 'paid_card') {
                     bubblesHtml += `
                     <div style="align-self:center; background:#e8f5e9; color:#2e7d32; font-size:11.5px; font-weight:700; padding:6px 14px; border-radius:12px;">
-                        ✅ 买家已拍下并付款 ¥${parseFloat(m.amount).toFixed(2)}
+                        买家已拍下并付款 ¥${parseFloat(m.amount).toFixed(2)}
                     </div>`;
                 } else if (m.type === 'shipped_card') {
                     bubblesHtml += `
                     <div style="align-self:center; background:#e3f2fd; color:#1565c0; font-size:11.5px; font-weight:700; padding:6px 14px; border-radius:12px;">
-                        🚚 卖家已安排快递发出包裹
+                        卖家已安排快递发出包裹
                     </div>`;
                 } else {
                     const isMe = m.from === 'me';
                     const senderLabel = isMe ? myName : (m.sender || partnerName);
-                    // 仅对对方发来的历史和新消息去除末尾句号，用户的发言完全保留不作修改
                     const displayText = isMe ? (m.text || '') : String(m.text || '').replace(/[。．.]+$/g, '').trim();
                     bubblesHtml += `
                     <div style="display:flex; flex-direction:column; align-items:${isMe ? 'flex-end' : 'flex-start'};">
@@ -57946,7 +58255,7 @@ sysPrompt += `
             document.getElementById('modal-wx-xj-detail').style.display = 'flex';
         },
 
-        // 点击微信中的「闲集订单分享卡片」展开实时物流时间轴与交易详情
+        // 点击微信中的「闲集订单分享卡片」展开实时物流时间轴与交易详情（带裁剪实拍商品图）
         openXjOrderShareDetail: function(msgIdx, event) {
             if (event) event.stopPropagation();
             const chat = appData.chats.find(c => c.id === this.currentChatId);
@@ -57959,6 +58268,9 @@ sysPrompt += `
             const myName = msg.myName || this.getUserInfo().name || '我';
             const isSold = ord.type === 'sold';
             const stg = ord.stageIndex || 0;
+            const gImgUrl = ord.good.imageUrl || (window.XianJiApp ? window.XianJiApp.buildGoodImageUrl(ord.good.title, msgIdx) : '');
+            const gThumbHtml = this.buildCroppedThumbBox(gImgUrl, ord.good.emoji || '🛍️', 56, 12, 28);
+
             const statusText = stg === 0 ? (isSold ? '买家已付款 · 等待卖家发货' : '已付款 · 等待卖家发货')
                 : (stg === 1 ? '卖家已发货 · 等待揽收'
                 : (stg === 2 ? '快递员已揽收'
@@ -57984,17 +58296,15 @@ sysPrompt += `
             `).join('');
 
             body.innerHTML = `
-            <!-- 顶部实时状态横幅 -->
             <div style="background:linear-gradient(135deg, #1c1c1e 0%, #2c2c2e 100%); border-radius:18px; padding:16px; color:#fff; box-shadow:0 8px 20px rgba(0,0,0,0.08);">
                 <div style="font-size:11px; color:#ffda00; font-weight:700; letter-spacing:0.5px;">● 闲集担保交易 · 实时状态</div>
                 <div style="font-size:17px; font-weight:800; margin-top:4px;">${statusText}</div>
                 <div style="font-size:11.5px; color:rgba(255,255,255,0.7); margin-top:4px;">配送路线：${ord.sellerCity || '发件地'} ➔ ${ord.toCity || ''}${ord.toDistrict || ''}</div>
             </div>
 
-            <!-- 商品与买卖双方信息卡 -->
             <div style="background:#ffffff; border-radius:16px; padding:14px; border:0.5px solid #ececef; display:flex; flex-direction:column; gap:10px;">
                 <div style="display:flex; gap:12px; align-items:center; padding-bottom:10px; border-bottom:0.5px solid #f2f2f5;">
-                    <div style="width:54px; height:54px; border-radius:12px; background:#f8f9fa; display:flex; align-items:center; justify-content:center; font-size:30px; flex-shrink:0;">${ord.good.emoji || '🛍️'}</div>
+                    ${gThumbHtml}
                     <div style="flex:1; min-width:0;">
                         <div style="font-size:14px; font-weight:800; color:#111;">${ord.good.title}</div>
                         <div style="font-size:11.5px; color:#8e8e93; margin-top:2px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${ord.good.desc || ''}</div>
@@ -58019,10 +58329,9 @@ sysPrompt += `
             </div>
 
             ${ord.review ? `
-            <!-- 交易评价卡 -->
             <div style="background:#ffffff; border-radius:16px; padding:14px; border:0.5px solid #ececef; display:flex; flex-direction:column; gap:8px;">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span style="font-size:13px; font-weight:800; color:#111;">⭐ 买家交易评价</span>
+                    <span style="font-size:13px; font-weight:800; color:#111;">买家交易评价</span>
                     <span style="font-size:11px; background:#111; color:#ffda00; padding:2px 8px; border-radius:6px; font-weight:700;">${ord.review.buyerRating}</span>
                 </div>
                 <div style="font-size:13px; color:#222; line-height:1.55;">${ord.review.buyerComment}</div>
@@ -58032,9 +58341,8 @@ sysPrompt += `
                 </div>` : ''}
             </div>` : ''}
 
-            <!-- 实时物流追踪卡 -->
             <div style="background:#ffffff; border-radius:16px; padding:14px; border:0.5px solid #ececef;">
-                <div style="font-size:13px; font-weight:800; color:#111; margin-bottom:12px;">🚚 物流追踪动态</div>
+                <div style="font-size:13px; font-weight:800; color:#111; margin-bottom:12px;">物流追踪动态</div>
                 <div style="display:flex; flex-direction:column; gap:6px;">${logsHtml}</div>
             </div>`;
 
@@ -58099,6 +58407,116 @@ sysPrompt += `
             window.WaimaiApp.openStoreDetail(storeId);
             AppNav.goTo('page-waimai').finally(() => {
                 window.WaimaiApp._skipDefaultReset = false;
+            });
+        },
+
+        // ================= 旅行 APP 微信卡片读取与点击穿透详情 =================
+        getLiveTravelOrder: function(msg) {
+            if (!msg) return null;
+            if (window.TravelApp && window.TravelApp.findOrderGlobal && msg.orderId) {
+                const res = window.TravelApp.findOrderGlobal(msg.orderId);
+                if (res && res.order) return res.order;
+            }
+            return msg.snapshotOrder || null;
+        },
+
+        // 将旅行订单/代付卡片完整序列化给大模型读取
+        formatTravelOrderForLLM: function(msg) {
+            const ord = this.getLiveTravelOrder(msg);
+            if (!ord) return `[旅行订单卡片]`;
+            const liveState = (window.TravelApp && window.TravelApp.computeOrderLiveState) ? window.TravelApp.computeOrderLiveState(ord) : { code: ord.status || 'paid', label: ord.status === 'unpaid' ? '待代付' : '已出票' };
+            const isUnpaid = liveState.code === 'unpaid';
+            const seatInfo = (ord.seatAllocations && ord.seatAllocations.length > 0) ? `，席位分配:${ord.seatAllocations.join('、')}` : '';
+            const snap = ord.rawSnapshot || {};
+            let extraDetail = '';
+            if (ord.orderType === 'tour') {
+                extraDetail = ` | 包含交通:${snap.transportInfo || '往返大交通'} | 包含住宿:${snap.hotelInfo || '高星酒店'} | 包含门票:${snap.scenicInfo || '核心景区门票'}`;
+            } else if (ord.orderType === 'hotel') {
+                extraDetail = ` | 入住:${ord.checkInDate || ord.dateStr}至${ord.checkOutDate || ''} 共${ord.nights || 1}晚(${ord.roomCount || 1}间) | 地址:${snap.address || ord.city}`;
+            } else if (ord.orderType === 'scenic') {
+                extraDetail = ` | 景区介绍:${snap.intro || snap.slogan || ord.subTitle}`;
+            }
+
+            if (msg.shareKind === 'daifu') {
+                return `[旅行订单代付请求卡片(订单ID:${ord.id}) | 目的地:${ord.city} | 项目:「${ord.title}」(${ord.subTitle}) | 出行日期:${ord.dateStr} | 实名出行人:${(ord.passengers||[]).join('、')}${seatInfo}${extraDetail} | 待付总金额:¥${ord.totalPaid} | 当前状态:${isUnpaid ? `待你代付买单（同意帮TA付款请输出 [同意旅行代付:${ord.id}]，拒绝或暂不代付请输出 [拒绝旅行代付:${ord.id}]）` : `已由 ${ord.payerName || '好友'} 完成代付，订单状态:${liveState.label}`}]`;
+            }
+            return `[分享了旅行订单卡片(订单ID:${ord.id}) | 目的地:${ord.city} | 项目:「${ord.title}」(${ord.subTitle}) | 出行日期:${ord.dateStr} | 实名出行人:${(ord.passengers||[]).join('、')}${seatInfo}${extraDetail} | 订单金额:¥${ord.totalPaid} | 当前状态:${liveState.label}(${ord.payMethod || '已支付'})]`;
+        },
+
+        // 将旅行详情分享卡片（酒店/景点/跟团游）完整序列化给大模型读取
+        formatTravelItemShareForLLM: function(msg) {
+            const it = msg.snapshotItem || {};
+            const mode = msg.itemMode || 'scenic';
+            const priceVal = it.minPrice || it.price || 180;
+            if (mode === 'hotel') {
+                const roomsStr = (it.rooms || []).map(r => `${r.name}(${r.spec}, ¥${r.price}/晚)`).join('；');
+                return `[分享了旅行酒店卡片：「${it.name}」 | 城市:${msg.city || it.city || ''} | 评分:${it.score || 4.9}分 | 地址:${it.address || it.nearBy || ''} | 亮点:"${it.quote || ''}" | 最低¥${priceVal}起 | 可选房型:${roomsStr} | 配套设施:${(it.facilities||[]).join('、')}]`;
+            } else if (mode === 'tour') {
+                const featsStr = (it.features || []).join('；');
+                const schedStr = (it.dailySchedule || []).map((d, i) => typeof d === 'object' ? `${d.day||('D'+(i+1))}:${d.title}(${d.desc||''})` : d).join(' | ');
+                return `[分享了旅行跟团游卡片：「${it.name}」(${it.agency || '官方国旅'}) | 价格:¥${priceVal}/人 | 产品特色:${featsStr} | 往返交通:${it.transportInfo || ''} | 住宿:${it.hotelInfo || ''} | 每日行程安排:${schedStr}]`;
+            }
+            const tksStr = (it.tickets || []).map(t => `${t.title}(¥${t.price})`).join('；');
+            return `[分享了旅行景点门票卡片：「${it.name}」 | 城市:${msg.city || it.city || ''} | 评分:${it.score || 4.9}分 | 地址:${it.address || ''} | 景区介绍:"${it.intro || it.slogan || ''}" | 门票选项:${tksStr || ('¥' + priceVal + '起')}]`;
+        },
+
+        // 将旅行候选列表清单卡片完整序列化给大模型读取
+        formatTravelListShareForLLM: function(msg) {
+            const arr = msg.snapshotList || [];
+            const mode = msg.listMode || 'hotel';
+            const itemsSummary = arr.map((it, i) => {
+                if (mode === 'flight') return `${i+1}. ${it.flightNo}(${it.depTime}-${it.arrTime}, ${it.cabinType}, ¥${it.price})`;
+                if (mode === 'train') return `${i+1}. ${it.trainNo}次列车(${it.depTime}-${it.arrTime}, 二等座¥${(it.seats&&it.seats[0])?it.seats[0].price:150})`;
+                return `${i+1}. 「${it.name}」(${it.score||4.9}分, ¥${it.minPrice||it.price||180}起, ${it.quote||it.slogan||(it.features&&it.features[0])||''})`;
+            }).join('；');
+            return `[分享了旅行候选列表卡片：「${msg.listTitle || '精选列表'}」(共${arr.length}项候选) | 详细列表内容：${itemsSummary}]`;
+        },
+
+        // 点击微信中的「旅行订单/代付卡片」-> 直达旅行订单详情页（且返回键直接回到微信）
+        openTravelOrderCardDetail: function(orderId, event) {
+            if (event) event.stopPropagation();
+            if (!window.TravelApp) return;
+            AppNav.goTo('page-travel').then(() => {
+                window.TravelApp.openOrderDetailById(orderId, true);
+            });
+        },
+
+        // 点击微信中的「旅行酒店/景点/跟团游详情卡片」-> 直达对应详情页
+        openTravelItemShareDetail: function(msgIdx, event) {
+            if (event) event.stopPropagation();
+            const chat = appData.chats.find(c => c.id === this.currentChatId);
+            const msg = chat ? chat.messages[msgIdx] : null;
+            if (!msg || !msg.snapshotItem || !window.TravelApp) return;
+
+            AppNav.goTo('page-travel').then(() => {
+                window.TravelApp.currentListMode = msg.itemMode || 'scenic';
+                window.TravelApp.activeItemObj = msg.snapshotItem;
+                window.TravelApp.renderItemDetailPage(msg.snapshotItem, msg.itemMode || 'scenic');
+            });
+        },
+
+        // 点击微信中的「旅行列表清单卡片」-> 直达对应列表页
+        openTravelListShareDetail: function(msgIdx, event) {
+            if (event) event.stopPropagation();
+            const chat = appData.chats.find(c => c.id === this.currentChatId);
+            const msg = chat ? chat.messages[msgIdx] : null;
+            if (!msg || !msg.snapshotList || !window.TravelApp) return;
+
+            AppNav.goTo('page-travel').then(() => {
+                const mode = msg.listMode || 'hotel';
+                const list = msg.snapshotList || [];
+                window.TravelApp.currentListMode = mode;
+                document.getElementById('trv-list-page-title').innerText = msg.listTitle || '精选列表';
+                if (mode === 'flight' && list[0]) {
+                    window.TravelApp._currentFlightsList = list;
+                    window.TravelApp.renderFlightListPage(list[0].fromCity || '上海', list[0].toCity || msg.city || '杭州', list[0].dateStr || window.TravelApp.getDateStrOffset(0), list[0].cabinType || '经济舱');
+                } else if (mode === 'train' && list[0]) {
+                    window.TravelApp._currentTrainsList = list;
+                    window.TravelApp.renderTrainListPage(list[0].fromCity || '上海', list[0].toCity || msg.city || '杭州', list[0].dateStr || window.TravelApp.getDateStrOffset(0));
+                } else {
+                    window.TravelApp.renderGeneratedListItems(mode, list);
+                    document.getElementById('trv-subpage-list').classList.add('show');
+                }
             });
         },
 
