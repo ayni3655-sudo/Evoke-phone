@@ -13914,6 +13914,7 @@ if (badgeEl) {
                     audio.dataset.bound = 'true';
 
                     audio.ontimeupdate = () => {
+                        if (this._isDraggingProgress) return;
                         const cur = audio.currentTime || 0;
                         const dur = audio.duration || 0;
                         if (dur > 0) {
@@ -13927,6 +13928,8 @@ if (badgeEl) {
                         }
                         this.syncLyricsByTime(cur, dur);
                     };
+
+                    this.bindProgressDragEvents();
 
                     audio.onended = () => {
                         if (this.playMode === 'loop') {
@@ -14481,12 +14484,92 @@ if (badgeEl) {
                 },
 
                 seekByClick: function(e) {
+                    if (this._justFinishedDrag) {
+                        this._justFinishedDrag = false;
+                        return;
+                    }
                     const bar = document.getElementById('cm-fp-progress-bar');
                     const audio = document.getElementById('cm-global-audio');
-                    if (!bar || !audio || !audio.duration) return;
+                    if (!bar || !audio || !audio.duration || !isFinite(audio.duration)) return;
                     const rect = bar.getBoundingClientRect();
-                    const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-                    audio.currentTime = pct * audio.duration;
+                    const clientX = e.clientX !== undefined ? e.clientX : (e.changedTouches && e.changedTouches[0] ? e.changedTouches[0].clientX : 0);
+                    const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+                    const targetTime = pct * audio.duration;
+                    audio.currentTime = targetTime;
+                    const fill = document.getElementById('cm-fp-progress-fill');
+                    if (fill) fill.style.width = `${pct * 100}%`;
+                    const curEl = document.getElementById('cm-fp-cur-time');
+                    if (curEl) curEl.innerText = this.formatSec(targetTime);
+                    this.lastActiveLyricIdx = -1;
+                    this.syncLyricsByTime(targetTime, audio.duration);
+                },
+
+                bindProgressDragEvents: function() {
+                    const bar = document.getElementById('cm-fp-progress-bar');
+                    const audio = document.getElementById('cm-global-audio');
+                    if (!bar || !audio || bar.dataset.dragBound) return;
+                    bar.dataset.dragBound = 'true';
+                    bar.style.touchAction = 'none';
+
+                    const getPctFromEvent = (ev) => {
+                        const rect = bar.getBoundingClientRect();
+                        const point = (ev.touches && ev.touches[0]) || (ev.changedTouches && ev.changedTouches[0]) || ev;
+                        const clientX = point ? point.clientX : 0;
+                        return Math.max(0, Math.min(1, (clientX - rect.left) / (rect.width || 1)));
+                    };
+
+                    const updatePreviewUI = (pct) => {
+                        const dur = (audio.duration && isFinite(audio.duration)) ? audio.duration : 0;
+                        const fill = document.getElementById('cm-fp-progress-fill');
+                        if (fill) fill.style.width = `${pct * 100}%`;
+                        if (dur > 0) {
+                            const previewTime = pct * dur;
+                            const curEl = document.getElementById('cm-fp-cur-time');
+                            if (curEl) curEl.innerText = this.formatSec(previewTime);
+                            this.lastActiveLyricIdx = -1;
+                            this.syncLyricsByTime(previewTime, dur);
+                        }
+                    };
+
+                    const onStart = (ev) => {
+                        if (!audio.duration || !isFinite(audio.duration)) return;
+                        this._isDraggingProgress = true;
+                        this._dragMoved = false;
+                        this._dragPct = getPctFromEvent(ev);
+                        updatePreviewUI(this._dragPct);
+                    };
+
+                    const onMove = (ev) => {
+                        if (!this._isDraggingProgress) return;
+                        if (ev.cancelable) ev.preventDefault();
+                        this._dragMoved = true;
+                        this._dragPct = getPctFromEvent(ev);
+                        updatePreviewUI(this._dragPct);
+                    };
+
+                    const onEnd = () => {
+                        if (!this._isDraggingProgress) return;
+                        this._isDraggingProgress = false;
+                        if (this._dragMoved) {
+                            this._justFinishedDrag = true;
+                            setTimeout(() => { this._justFinishedDrag = false; }, 100);
+                        }
+                        if (audio.duration && isFinite(audio.duration) && this._dragPct !== undefined) {
+                            const finalTime = this._dragPct * audio.duration;
+                            audio.currentTime = finalTime;
+                            this.lastActiveLyricIdx = -1;
+                            this.syncLyricsByTime(finalTime, audio.duration);
+                        }
+                    };
+
+                    bar.addEventListener('touchstart', onStart, { passive: true });
+                    window.addEventListener('touchmove', onMove, { passive: false });
+                    window.addEventListener('touchend', onEnd);
+                    window.addEventListener('touchcancel', onEnd);
+
+                    bar.addEventListener('mousedown', onStart);
+                    window.addEventListener('mousemove', onMove);
+                    window.addEventListener('mouseup', onEnd);
                 },
 
                 openFullPlayer: function() {
@@ -14553,94 +14636,128 @@ if (badgeEl) {
                 parseAlignedWordsToLines: function(alignedWords, rawLyricsText) {
                     if (!Array.isArray(alignedWords) || alignedWords.length === 0) return [];
 
-                    const wordTokens = [];
-                    alignedWords.forEach(item => {
-                        if (!item || typeof item.word !== 'string') return;
+                    const segments = [];
+                    let curSeg = { words: [], start: null, end: 0 };
+
+                    const pushCurSeg = () => {
+                        if (curSeg.words.length === 0 || curSeg.start === null) {
+                            curSeg = { words: [], start: null, end: 0 };
+                            return;
+                        }
+                        let rawJoined = curSeg.words.join('');
+                        // 清理各种完整或跨词闭合的方括号结构标签（如 [Verse 1]、[Chorus] 等）
+                        let cleanLine = rawJoined
+                            .replace(/\[[\s\S]*?\]/g, '')
+                            .replace(/^[^\u4e00-\u9fa5a-zA-Z0-9\u3040-\u30ff\uac00-\ud7af\['"“‘（(]+/, '')
+                            .replace(/\s+/g, ' ')
+                            .trim();
+
+                        if (cleanLine) {
+                            segments.push({
+                                time: Number(curSeg.start.toFixed(2)),
+                                end: Number(curSeg.end.toFixed(2)),
+                                text: cleanLine
+                            });
+                        }
+                        curSeg = { words: [], start: null, end: 0 };
+                    };
+
+                    // 1. 严格尊重官方 aligned_words 自带的 \n 换行符与真实时间戳进行切分
+                    for (let i = 0; i < alignedWords.length; i++) {
+                        const item = alignedWords[i];
+                        if (!item || typeof item.word !== 'string') continue;
+
                         const sTime = Number(item.start_s);
-                        const eTime = Number(item.end_s) || sTime;
-                        const subParts = item.word.split('\n');
-                        subParts.forEach((sp, idx) => {
-                            const cleanW = sp.replace(/\[(?:Verse|Pre-Chorus|Chorus|Bridge|Intro|Outro|Interlude|Solo|Hook|Instrumental|End).*?\]/gi, '').trim();
-                            if (cleanW) {
-                                wordTokens.push({
-                                    word: cleanW,
-                                    start: isNaN(sTime) ? 0 : sTime,
-                                    end: isNaN(eTime) ? 0 : eTime,
-                                    hasNewlineAfter: idx < subParts.length - 1
-                                });
-                            } else if (idx < subParts.length - 1 && wordTokens.length > 0) {
-                                wordTokens[wordTokens.length - 1].hasNewlineAfter = true;
+                        const eTime = Number(item.end_s);
+                        const validStart = !isNaN(sTime) ? sTime : (curSeg.end || 0);
+                        const validEnd = !isNaN(eTime) ? eTime : validStart;
+
+                        const parts = item.word.split(/\r?\n/);
+                        for (let pIdx = 0; pIdx < parts.length; pIdx++) {
+                            const part = parts[pIdx];
+                            const strippedCheck = part.replace(/\[[\s\S]*?\]/g, '').trim();
+
+                            if (part.trim().length > 0) {
+                                // 只有当该词不是纯结构标签（如 "[Verse 1]"）时，才用它的 start_s 作为本句歌词真正的开口起唱时间
+                                if (curSeg.start === null && strippedCheck.length > 0 && !strippedCheck.startsWith('[')) {
+                                    curSeg.start = validStart;
+                                }
+                                curSeg.words.push(part);
+                                curSeg.end = validEnd;
                             }
-                        });
-                    });
 
-                    if (wordTokens.length === 0) return [];
+                            // 遇到词内的换行符 \n，说明这一行已经结束，立即断句
+                            if (pIdx < parts.length - 1) {
+                                pushCurSeg();
+                            }
+                        }
 
-                    // 优先对照原始歌词的行结构，把逐词时间轴精准映射到每一行上
+                        // 若整首歌的 aligned_words 完全没有带 \n，仅在遇到长间奏停顿（>1.8秒）或单句过长时断句
+                        if (curSeg.words.length > 0 && i < alignedWords.length - 1) {
+                            const nextItem = alignedWords[i + 1];
+                            const nextStart = nextItem ? Number(nextItem.start_s) : NaN;
+                            const gap = !isNaN(nextStart) ? (nextStart - validEnd) : 0;
+                            const curLen = curSeg.words.join('').replace(/\[[\s\S]*?\]/g, '').trim().length;
+                            if ((gap >= 1.8 && curLen >= 4) || curLen >= 34) {
+                                pushCurSeg();
+                            }
+                        }
+                    }
+                    pushCurSeg();
+
+                    if (segments.length === 0) return [];
+
+                    // 2. 智能匹配原始歌词标点与文本（仅在相似度高时美化文本，绝不串改官方每行的起唱时间戳）
                     const cleanRawLines = String(rawLyricsText || '')
-                        .split('\n')
+                        .split(/\r?\n/)
                         .map(l => l.replace(/\[.*?\]/g, '').trim())
                         .filter(Boolean);
 
-                    if (cleanRawLines.length >= 3) {
-                        const resultLines = [];
-                        let tokenIdx = 0;
-
-                        for (let lineStr of cleanRawLines) {
-                            if (tokenIdx >= wordTokens.length) break;
-                            const targetPureLen = lineStr.replace(/[^\u4e00-\u9fa5a-zA-Z0-9\u3040-\u30ff\uac00-\ud7af]/g, '').length || lineStr.length;
-                            const lineStartTime = wordTokens[tokenIdx].start;
-                            let accLen = 0;
-
-                            while (tokenIdx < wordTokens.length) {
-                                const tk = wordTokens[tokenIdx];
-                                const tkPureLen = tk.word.replace(/[^\u4e00-\u9fa5a-zA-Z0-9\u3040-\u30ff\uac00-\ud7af]/g, '').length || 1;
-                                accLen += tkPureLen;
-                                tokenIdx++;
-                                const nextTk = wordTokens[tokenIdx];
-                                const gap = nextTk ? (nextTk.start - tk.end) : 99;
-                                if (accLen >= targetPureLen || tk.hasNewlineAfter || (accLen >= targetPureLen * 0.6 && gap > 0.65)) {
-                                    break;
+                    if (cleanRawLines.length > 0) {
+                        const getPureStr = (s) => String(s || '').toLowerCase().replace(/[^\u4e00-\u9fa5a-z0-9\u3040-\u30ff\uac00-\ud7af]/g, '');
+                        const calcSimilarity = (s1, s2) => {
+                            const a = getPureStr(s1);
+                            const b = getPureStr(s2);
+                            if (!a || !b) return 0;
+                            if (a === b) return 1;
+                            if (a.includes(b) || b.includes(a)) {
+                                return Math.min(a.length, b.length) / Math.max(a.length, b.length);
+                            }
+                            let match = 0;
+                            const used = new Array(b.length).fill(false);
+                            for (let i = 0; i < a.length; i++) {
+                                for (let j = 0; j < b.length; j++) {
+                                    if (!used[j] && a[i] === b[j]) {
+                                        used[j] = true;
+                                        match++;
+                                        break;
+                                    }
                                 }
                             }
-                            resultLines.push({ time: Number(lineStartTime.toFixed(2)), text: lineStr });
-                        }
-                        if (resultLines.length > 0) return resultLines;
+                            return match / Math.max(a.length, b.length);
+                        };
+
+                        let rawCursor = 0;
+                        segments.forEach(seg => {
+                            let bestIdx = -1;
+                            let bestScore = 0;
+                            const winStart = Math.max(0, rawCursor - 1);
+                            const winEnd = Math.min(cleanRawLines.length - 1, rawCursor + 4);
+                            for (let r = winStart; r <= winEnd; r++) {
+                                const score = calcSimilarity(seg.text, cleanRawLines[r]);
+                                if (score > bestScore) {
+                                    bestScore = score;
+                                    bestIdx = r;
+                                }
+                            }
+                            if (bestScore >= 0.65 && bestIdx !== -1) {
+                                seg.text = cleanRawLines[bestIdx];
+                                rawCursor = bestIdx + 1;
+                            }
+                        });
                     }
 
-                    // 兜底：根据换行符、词间停顿（>0.55秒）或单行字数自动断句
-                    const lines = [];
-                    let curWords = [];
-                    let curStart = null;
-                    let curCharCount = 0;
-
-                    const flush = () => {
-                        if (curWords.length === 0 || curStart === null) return;
-                        let text = curWords.join(' ');
-                        const isCJK = /[\u4e00-\u9fa5\u3040-\u30ff\uac00-\ud7af]/.test(text);
-                        if (isCJK) {
-                            text = text.replace(/([\u4e00-\u9fa5\u3040-\u30ff\uac00-\ud7af])\s+(?=[\u4e00-\u9fa5\u3040-\u30ff\uac00-\ud7af])/g, '$1');
-                        }
-                        lines.push({ time: Number(curStart.toFixed(2)), text: text.trim() });
-                        curWords = [];
-                        curStart = null;
-                        curCharCount = 0;
-                    };
-
-                    for (let i = 0; i < wordTokens.length; i++) {
-                        const tk = wordTokens[i];
-                        if (curStart === null) curStart = tk.start;
-                        curWords.push(tk.word);
-                        curCharCount += tk.word.length;
-
-                        const nextTk = wordTokens[i + 1];
-                        const gap = nextTk ? (nextTk.start - tk.end) : 99;
-                        if (tk.hasNewlineAfter || gap >= 0.55 || curCharCount >= 16) {
-                            flush();
-                        }
-                    }
-                    flush();
-                    return lines;
+                    return segments.map(s => ({ time: s.time, text: s.text }));
                 },
 
                 fetchSunoTimelineForTrack: async function(track) {
@@ -14653,7 +14770,13 @@ if (badgeEl) {
                         return track[cacheKey];
                     }
 
-                    const clipId = this.extractSongClipId(track);
+                    // 提取真实 UUID 格式的 clipId（支持从音频链接中反解，防止带下划线的临时 ID 被拦截）
+                    let clipId = this.extractSongClipId(track);
+                    const targetAudioUrl = (activeVer === 'B' && track.audioUrlB) ? track.audioUrlB : track.audioUrl;
+                    if ((!clipId || clipId.includes('_')) && targetAudioUrl) {
+                        const uuidMatch = targetAudioUrl.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+                        if (uuidMatch) clipId = uuidMatch[1];
+                    }
                     if (!clipId || clipId.includes('_')) return null;
 
                     const musConf = appData.settings.music || {};
@@ -14666,31 +14789,87 @@ if (badgeEl) {
                     if (this._timelineFetchingMap[lockId]) return null;
                     this._timelineFetchingMap[lockId] = true;
 
+                    // 深度递归提取 aligned_words 数组，兼容任意多层嵌套与字符串转义结构
+                    const extractAlignedWordsDeep = (obj) => {
+                        if (!obj) return null;
+                        if (typeof obj === 'string') {
+                            const s = obj.trim();
+                            if ((s.startsWith('{') && s.endsWith('}')) || (s.startsWith('[') && s.endsWith(']'))) {
+                                try { return extractAlignedWordsDeep(JSON.parse(s)); } catch (e) { return null; }
+                            }
+                            return null;
+                        }
+                        if (Array.isArray(obj)) {
+                            if (obj.length > 0 && obj[0] && typeof obj[0].word === 'string' && obj[0].start_s !== undefined) {
+                                return obj;
+                            }
+                            for (let item of obj) {
+                                const found = extractAlignedWordsDeep(item);
+                                if (found) return found;
+                            }
+                            return null;
+                        }
+                        if (typeof obj === 'object') {
+                            if (Array.isArray(obj.aligned_words) && obj.aligned_words.length > 0) return obj.aligned_words;
+                            if (Array.isArray(obj.alignedWords) && obj.alignedWords.length > 0) return obj.alignedWords;
+                            for (let k of Object.keys(obj)) {
+                                if (k === 'param') continue;
+                                const found = extractAlignedWordsDeep(obj[k]);
+                                if (found) return found;
+                            }
+                        }
+                        return null;
+                    };
+
                     try {
                         let taskId = track[taskCacheKey] || '';
-                        if (!taskId) {
-                            const subRes = await fetch(`${baseUrl}/api/cqt/generator/suno`, {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'Authorization': `Bearer ${apiKey}`
-                                },
-                                body: JSON.stringify({ task: 'timeline', clipId: clipId })
-                            });
-                            const subData = await subRes.json().catch(() => null);
-                            if (subRes.ok && (!subData?.code || subData.code === 200)) {
-                                taskId = typeof subData?.data === 'string'
-                                    ? subData.data.trim()
-                                    : String(subData?.data?.id || subData?.id || '').trim();
-                                if (taskId) {
-                                    track[taskCacheKey] = taskId;
-                                    this.syncSongDataEverywhere(track);
+
+                        const submitTimelineTask = async () => {
+                            try {
+                                const subRes = await fetch(`${baseUrl}/api/cqt/generator/suno`, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'Authorization': `Bearer ${apiKey}`
+                                    },
+                                    body: JSON.stringify({ task: 'timeline', clipId: clipId })
+                                });
+                                const subData = await subRes.json().catch(() => null);
+                                if (!subData) return '';
+
+                                // 若接口直接同步返回了包含 aligned_words 的结果
+                                const directWords = extractAlignedWordsDeep(subData);
+                                if (directWords && directWords.length > 0) {
+                                    const parsed = this.parseAlignedWordsToLines(directWords, track.rawLyrics);
+                                    if (parsed.length > 0) {
+                                        track[cacheKey] = parsed;
+                                        this.syncSongDataEverywhere(track);
+                                        return '__DIRECT_RESOLVED__';
+                                    }
                                 }
+
+                                const tid = typeof subData?.data === 'string'
+                                    ? subData.data.trim()
+                                    : String(subData?.data?.id || subData?.data?.task_id || subData?.id || subData?.task_id || '').trim();
+                                if (tid && !tid.startsWith('{') && !tid.startsWith('[')) {
+                                    track[taskCacheKey] = tid;
+                                    this.syncSongDataEverywhere(track);
+                                    return tid;
+                                }
+                            } catch (err) {
+                                console.warn('[Suno Timeline] 提交任务异常:', err);
                             }
+                            return '';
+                        };
+
+                        if (!taskId) {
+                            taskId = await submitTimelineTask();
+                            if (taskId === '__DIRECT_RESOLVED__') return track[cacheKey];
                         }
                         if (!taskId) return null;
 
-                        for (let i = 0; i < 18; i++) {
+                        let hasRetriedSubmit = false;
+                        for (let i = 0; i < 24; i++) {
                             if (i > 0) await new Promise(r => setTimeout(r, 2000));
                             const pollUrl = `${baseUrl}/api/cqt/info/suno?id=${encodeURIComponent(taskId)}&_t=${Date.now()}`;
                             const infoRes = await fetch(pollUrl, {
@@ -14701,20 +14880,7 @@ if (badgeEl) {
                             const infoJson = await infoRes.json().catch(() => null);
                             if (!infoJson) continue;
 
-                            let tData = infoJson.data !== undefined ? infoJson.data : infoJson;
-                            if (typeof tData === 'string') {
-                                try { tData = JSON.parse(tData); } catch (e) {}
-                            }
-                            const st = String(tData?.status || '').toLowerCase();
-                            if (st === 'failed' || st === 'error' || st === 'canceled') {
-                                delete track[taskCacheKey];
-                                break;
-                            }
-                            let resObj = tData?.result !== undefined ? tData.result : tData;
-                            if (typeof resObj === 'string') {
-                                try { resObj = JSON.parse(resObj); } catch (e) {}
-                            }
-                            const alignedWords = resObj?.aligned_words || tData?.aligned_words || null;
+                            const alignedWords = extractAlignedWordsDeep(infoJson);
                             if (Array.isArray(alignedWords) && alignedWords.length > 0) {
                                 const parsedLines = this.parseAlignedWordsToLines(alignedWords, track.rawLyrics);
                                 if (parsedLines.length > 0) {
@@ -14723,8 +14889,31 @@ if (badgeEl) {
                                     return parsedLines;
                                 }
                             }
-                            if (st === 'succeeded' || st === 'success' || st === 'completed' || st === 'complete') {
+
+                            let tData = infoJson.data !== undefined ? infoJson.data : infoJson;
+                            if (typeof tData === 'string') {
+                                try { tData = JSON.parse(tData); } catch (e) {}
+                            }
+                            const st = String(tData?.status || '').toLowerCase();
+
+                            if (st === 'failed' || st === 'error' || st === 'canceled') {
+                                delete track[taskCacheKey];
+                                this.syncSongDataEverywhere(track);
+                                if (!hasRetriedSubmit) {
+                                    hasRetriedSubmit = true;
+                                    await new Promise(r => setTimeout(r, 2500));
+                                    taskId = await submitTimelineTask();
+                                    if (taskId === '__DIRECT_RESOLVED__') return track[cacheKey];
+                                    if (taskId) continue;
+                                }
                                 break;
+                            }
+
+                            // 若状态已显示 succeeded 但本次尚未取到 aligned_words，清除旧任务号防止死锁，并再多等一轮确认
+                            if (st === 'succeeded' || st === 'success' || st === 'completed' || st === 'complete') {
+                                delete track[taskCacheKey];
+                                this.syncSongDataEverywhere(track);
+                                if (i >= 2) break;
                             }
                         }
                     } catch (e) {
@@ -14751,6 +14940,8 @@ if (badgeEl) {
                         if (Array.isArray(track[cacheKey]) && track[cacheKey].length > 0) {
                             this.currentLyrics = track[cacheKey];
                             this.renderLyricDOM();
+                            const audioNow = document.getElementById('cm-global-audio');
+                            if (audioNow) this.syncLyricsByTime(audioNow.currentTime || 0, audioNow.duration || track.duration || 150);
                             return;
                         }
 
@@ -14761,25 +14952,31 @@ if (badgeEl) {
                         this.currentLyrics = this.buildWeightedFallbackLyrics(track.rawLyrics || '', estDur);
                         this.renderLyricDOM();
 
-                        // 当音频加载出真实总时长后，自动用真实时长校准一次保底时间轴
+                        // 当音频加载出真实总时长后，若官方时间轴尚未返回，自动用真实时长校准一次保底时间轴
                         if (audioEl) {
                             audioEl.onloadedmetadata = () => {
+                                const curPlaying = this.playlistQueue[this.curTrackIdx];
+                                if (!curPlaying || curPlaying.id !== track.id) return;
                                 if (audioEl.duration && isFinite(audioEl.duration) && (!track[cacheKey] || track[cacheKey].length === 0)) {
                                     track.duration = Math.floor(audioEl.duration);
                                     this.currentLyrics = this.buildWeightedFallbackLyrics(track.rawLyrics || '', audioEl.duration);
                                     this.lastActiveLyricIdx = -1;
                                     this.renderLyricDOM();
+                                    this.syncLyricsByTime(audioEl.currentTime || 0, audioEl.duration);
                                 }
                             };
                         }
 
-                        // 后台异步拉取官方逐词时间轴，若刚生歌完后台尚未就绪则 6 秒后自动重试一次
+                        // 后台异步拉取官方逐词时间轴（支持自动阶梯式重试，解决刚生完歌后台还在自动生成中的延迟）
                         if (track.isCharSong) {
                             const tryLoadTimeline = async (delayMs = 0) => {
                                 if (delayMs > 0) await new Promise(r => setTimeout(r, delayMs));
+                                const curPlayingBefore = this.playlistQueue[this.curTrackIdx];
+                                if (!curPlayingBefore || curPlayingBefore.id !== track.id) return true;
+
                                 const alignedLines = await this.fetchSunoTimelineForTrack(track);
-                                const curPlayingTrack = this.playlistQueue[this.curTrackIdx];
-                                if (alignedLines && alignedLines.length > 0 && curPlayingTrack && curPlayingTrack.id === track.id) {
+                                const curPlayingAfter = this.playlistQueue[this.curTrackIdx];
+                                if (alignedLines && alignedLines.length > 0 && curPlayingAfter && curPlayingAfter.id === track.id) {
                                     this.currentLyrics = alignedLines;
                                     this.lastActiveLyricIdx = -1;
                                     this.renderLyricDOM();
@@ -14789,9 +14986,11 @@ if (badgeEl) {
                                 }
                                 return false;
                             };
-                            tryLoadTimeline(0).then(ok => {
-                                if (!ok) tryLoadTimeline(6000);
-                            });
+                            (async () => {
+                                let ok = await tryLoadTimeline(0);
+                                if (!ok) ok = await tryLoadTimeline(5000);
+                                if (!ok) await tryLoadTimeline(10000);
+                            })();
                         }
                         return;
                     }
