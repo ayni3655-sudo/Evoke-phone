@@ -14154,14 +14154,66 @@ if (badgeEl) {
 
                     let hasTriedDirectApi = false;
 
+                    const tryFetchDirectAudioUrl = async () => {
+                        if (hasTriedDirectApi || !track.isCharSong || !curClipId || curClipId.includes('_')) return false;
+                        hasTriedDirectApi = true;
+                        this.showToast(`正在为版本 ${activeVer} 获取高速直链...`);
+                        try {
+                            const musConf = appData.settings.music || {};
+                            const baseUrl = this.getCleanMusicBaseUrl();
+                            const apiKey = (musConf.key || '').trim();
+                            if (apiKey) {
+                                const dlRes = await fetch(`${baseUrl}/api/cqt/v2/suno/download`, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'Authorization': `Bearer ${apiKey}`
+                                    },
+                                    body: JSON.stringify({ id: curClipId })
+                                });
+                                const dlJson = await dlRes.json().catch(() => null);
+                                const directUrl = typeof dlJson?.data === 'string'
+                                    ? dlJson.data
+                                    : (dlJson?.data?.url || dlJson?.data?.audio_url || dlJson?.url || '');
+                                if (directUrl && directUrl.startsWith('http')) {
+                                    if (activeVer === 'B') track.audioUrlB = directUrl;
+                                    else track.audioUrl = directUrl;
+                                    this.syncSongDataEverywhere(track);
+                                    startPlayUrl(directUrl);
+                                    return true;
+                                }
+                            }
+                        } catch (e) {
+                            console.warn('[Audio] 获取直链失败:', e);
+                        }
+                        return false;
+                    };
+
                     const startPlayUrl = (urlToPlay) => {
+                        if (this._audioLoadRetryTimer) {
+                            clearTimeout(this._audioLoadRetryTimer);
+                            this._audioLoadRetryTimer = null;
+                        }
                         audio.oncanplay = null;
                         audio.onerror = null;
 
                         audio.src = urlToPlay;
 
-                        // 当音频缓冲足够可以播放时自动触发播放，绝不用定时器反复打断缓冲
+                        // 如果超过 6 秒音频流依然卡在缓冲中未就绪，自动调用单曲下载接口换取 CDN 直链
+                        if (!hasTriedDirectApi && track.isCharSong && curClipId) {
+                            this._audioLoadRetryTimer = setTimeout(() => {
+                                if (this.curTrackIdx === idx && audio.readyState < 2) {
+                                    tryFetchDirectAudioUrl();
+                                }
+                            }, 6000);
+                        }
+
+                        // 当音频缓冲足够可以播放时自动触发播放
                         audio.oncanplay = () => {
+                            if (this._audioLoadRetryTimer) {
+                                clearTimeout(this._audioLoadRetryTimer);
+                                this._audioLoadRetryTimer = null;
+                            }
                             audio.oncanplay = null;
                             if (this.curTrackIdx !== idx) return;
                             audio.play().then(() => {
@@ -14172,44 +14224,17 @@ if (badgeEl) {
                             });
                         };
 
-                        // 如果原 CDN 链接无法加载，自动调用 CQTAI 官方单曲下载接口换取直链播放
+                        // 如果原 CDN 链接报错，自动调用单曲下载接口换取直链播放
                         audio.onerror = async () => {
+                            if (this._audioLoadRetryTimer) {
+                                clearTimeout(this._audioLoadRetryTimer);
+                                this._audioLoadRetryTimer = null;
+                            }
                             audio.onerror = null;
                             if (this.curTrackIdx !== idx) return;
 
-                            if (!hasTriedDirectApi && track.isCharSong && curClipId) {
-                                hasTriedDirectApi = true;
-                                this.showToast('正在通过中转站获取高速直链...');
-                                try {
-                                    const musConf = appData.settings.music || {};
-                                    const baseUrl = this.getCleanMusicBaseUrl();
-                                    const apiKey = (musConf.key || '').trim();
-                                    if (apiKey && baseUrl.includes('cqtai.com')) {
-                                        const dlRes = await fetch(`${baseUrl}/api/cqt/v2/suno/download`, {
-                                            method: 'POST',
-                                            headers: {
-                                                'Content-Type': 'application/json',
-                                                'Authorization': `Bearer ${apiKey}`
-                                            },
-                                            body: JSON.stringify({ id: curClipId })
-                                        });
-                                        const dlJson = await dlRes.json().catch(() => null);
-                                        const directUrl = typeof dlJson?.data === 'string'
-                                            ? dlJson.data
-                                            : (dlJson?.data?.url || dlJson?.data?.audio_url || dlJson?.url || '');
-                                        if (directUrl && directUrl.startsWith('http')) {
-                                            if (activeVer === 'B') track.audioUrlB = directUrl;
-                                            else track.audioUrl = directUrl;
-                                            saveMusicData();
-                                            saveChatData();
-                                            startPlayUrl(directUrl);
-                                            return;
-                                        }
-                                    }
-                                } catch (e) {
-                                    console.warn('[Audio] 获取直链失败:', e);
-                                }
-                            }
+                            const switched = await tryFetchDirectAudioUrl();
+                            if (switched) return;
 
                             this.isPlaying = false;
                             this.syncPlayStateUI();
@@ -14525,47 +14550,96 @@ if (badgeEl) {
                     });
                 },
 
-                parseAlignedWordsToLines: function(alignedWords) {
+                parseAlignedWordsToLines: function(alignedWords, rawLyricsText) {
                     if (!Array.isArray(alignedWords) || alignedWords.length === 0) return [];
-                    const lines = [];
-                    let curText = '';
-                    let curStart = null;
 
-                    const flushLine = () => {
-                        let clean = curText
-                            .replace(/\[(?:Verse|Pre-Chorus|Chorus|Bridge|Intro|Outro|Interlude|Solo|Hook|Instrumental|End).*?\]/gi, '')
-                            .replace(/\s+/g, ' ')
-                            .trim();
-                        const isCJK = /[\u4e00-\u9fa5\u3040-\u30ff\uac00-\ud7af]/.test(clean);
-                        if (isCJK) {
-                            clean = clean.replace(/([\u4e00-\u9fa5\u3040-\u30ff\uac00-\ud7af])\s+(?=[\u4e00-\u9fa5\u3040-\u30ff\uac00-\ud7af])/g, '$1');
-                        }
-                        if (clean && curStart !== null) {
-                            lines.push({ time: Number(curStart.toFixed(2)), text: clean });
-                        }
-                        curText = '';
-                        curStart = null;
-                    };
-
+                    const wordTokens = [];
                     alignedWords.forEach(item => {
                         if (!item || typeof item.word !== 'string') return;
-                        const w = item.word;
                         const sTime = Number(item.start_s);
-                        const parts = w.split('\n');
-
-                        for (let i = 0; i < parts.length; i++) {
-                            const part = parts[i];
-                            const strippedPart = part.replace(/\[.*?\]/g, '').trim();
-                            if (strippedPart && curStart === null && !isNaN(sTime)) {
-                                curStart = sTime;
+                        const eTime = Number(item.end_s) || sTime;
+                        const subParts = item.word.split('\n');
+                        subParts.forEach((sp, idx) => {
+                            const cleanW = sp.replace(/\[(?:Verse|Pre-Chorus|Chorus|Bridge|Intro|Outro|Interlude|Solo|Hook|Instrumental|End).*?\]/gi, '').trim();
+                            if (cleanW) {
+                                wordTokens.push({
+                                    word: cleanW,
+                                    start: isNaN(sTime) ? 0 : sTime,
+                                    end: isNaN(eTime) ? 0 : eTime,
+                                    hasNewlineAfter: idx < subParts.length - 1
+                                });
+                            } else if (idx < subParts.length - 1 && wordTokens.length > 0) {
+                                wordTokens[wordTokens.length - 1].hasNewlineAfter = true;
                             }
-                            curText += part;
-                            if (i < parts.length - 1) {
-                                flushLine();
-                            }
-                        }
+                        });
                     });
-                    flushLine();
+
+                    if (wordTokens.length === 0) return [];
+
+                    // 优先对照原始歌词的行结构，把逐词时间轴精准映射到每一行上
+                    const cleanRawLines = String(rawLyricsText || '')
+                        .split('\n')
+                        .map(l => l.replace(/\[.*?\]/g, '').trim())
+                        .filter(Boolean);
+
+                    if (cleanRawLines.length >= 3) {
+                        const resultLines = [];
+                        let tokenIdx = 0;
+
+                        for (let lineStr of cleanRawLines) {
+                            if (tokenIdx >= wordTokens.length) break;
+                            const targetPureLen = lineStr.replace(/[^\u4e00-\u9fa5a-zA-Z0-9\u3040-\u30ff\uac00-\ud7af]/g, '').length || lineStr.length;
+                            const lineStartTime = wordTokens[tokenIdx].start;
+                            let accLen = 0;
+
+                            while (tokenIdx < wordTokens.length) {
+                                const tk = wordTokens[tokenIdx];
+                                const tkPureLen = tk.word.replace(/[^\u4e00-\u9fa5a-zA-Z0-9\u3040-\u30ff\uac00-\ud7af]/g, '').length || 1;
+                                accLen += tkPureLen;
+                                tokenIdx++;
+                                const nextTk = wordTokens[tokenIdx];
+                                const gap = nextTk ? (nextTk.start - tk.end) : 99;
+                                if (accLen >= targetPureLen || tk.hasNewlineAfter || (accLen >= targetPureLen * 0.6 && gap > 0.65)) {
+                                    break;
+                                }
+                            }
+                            resultLines.push({ time: Number(lineStartTime.toFixed(2)), text: lineStr });
+                        }
+                        if (resultLines.length > 0) return resultLines;
+                    }
+
+                    // 兜底：根据换行符、词间停顿（>0.55秒）或单行字数自动断句
+                    const lines = [];
+                    let curWords = [];
+                    let curStart = null;
+                    let curCharCount = 0;
+
+                    const flush = () => {
+                        if (curWords.length === 0 || curStart === null) return;
+                        let text = curWords.join(' ');
+                        const isCJK = /[\u4e00-\u9fa5\u3040-\u30ff\uac00-\ud7af]/.test(text);
+                        if (isCJK) {
+                            text = text.replace(/([\u4e00-\u9fa5\u3040-\u30ff\uac00-\ud7af])\s+(?=[\u4e00-\u9fa5\u3040-\u30ff\uac00-\ud7af])/g, '$1');
+                        }
+                        lines.push({ time: Number(curStart.toFixed(2)), text: text.trim() });
+                        curWords = [];
+                        curStart = null;
+                        curCharCount = 0;
+                    };
+
+                    for (let i = 0; i < wordTokens.length; i++) {
+                        const tk = wordTokens[i];
+                        if (curStart === null) curStart = tk.start;
+                        curWords.push(tk.word);
+                        curCharCount += tk.word.length;
+
+                        const nextTk = wordTokens[i + 1];
+                        const gap = nextTk ? (nextTk.start - tk.end) : 99;
+                        if (tk.hasNewlineAfter || gap >= 0.55 || curCharCount >= 16) {
+                            flush();
+                        }
+                    }
+                    flush();
                     return lines;
                 },
 
@@ -14580,7 +14654,7 @@ if (badgeEl) {
                     }
 
                     const clipId = this.extractSongClipId(track);
-                    if (!clipId) return null;
+                    if (!clipId || clipId.includes('_')) return null;
 
                     const musConf = appData.settings.music || {};
                     const baseUrl = this.getCleanMusicBaseUrl();
@@ -14642,7 +14716,7 @@ if (badgeEl) {
                             }
                             const alignedWords = resObj?.aligned_words || tData?.aligned_words || null;
                             if (Array.isArray(alignedWords) && alignedWords.length > 0) {
-                                const parsedLines = this.parseAlignedWordsToLines(alignedWords);
+                                const parsedLines = this.parseAlignedWordsToLines(alignedWords, track.rawLyrics);
                                 if (parsedLines.length > 0) {
                                     track[cacheKey] = parsedLines;
                                     this.syncSongDataEverywhere(track);
@@ -14674,30 +14748,49 @@ if (badgeEl) {
                         const activeVer = track.activeVer || 'A';
                         const cacheKey = (activeVer === 'B') ? 'alignedLyricsB' : 'alignedLyricsA';
 
-                        // 若已有缓存的 CQTAI 官方 timeline 对齐歌词，直接毫秒级精准渲染
                         if (Array.isArray(track[cacheKey]) && track[cacheKey].length > 0) {
                             this.currentLyrics = track[cacheKey];
                             this.renderLyricDOM();
                             return;
                         }
 
-                        // 先用结构加权时间轴（保留 Intro/Interlude 空拍 + 按字数赋权）立即显示，避免空白等待
                         const audioEl = document.getElementById('cm-global-audio');
-                        const estDur = (audioEl && audioEl.duration && isFinite(audioEl.duration)) ? audioEl.duration : (track.duration || 120);
+                        const estDur = (audioEl && audioEl.duration && isFinite(audioEl.duration) && audioEl.duration > 10)
+                            ? audioEl.duration
+                            : (track.duration || 150);
                         this.currentLyrics = this.buildWeightedFallbackLyrics(track.rawLyrics || '', estDur);
                         this.renderLyricDOM();
 
-                        // 后台异步调用 CQTAI task:"timeline" 拉取官方逐词时间轴，拿到后无缝热切换为精准卡点歌词
+                        // 当音频加载出真实总时长后，自动用真实时长校准一次保底时间轴
+                        if (audioEl) {
+                            audioEl.onloadedmetadata = () => {
+                                if (audioEl.duration && isFinite(audioEl.duration) && (!track[cacheKey] || track[cacheKey].length === 0)) {
+                                    track.duration = Math.floor(audioEl.duration);
+                                    this.currentLyrics = this.buildWeightedFallbackLyrics(track.rawLyrics || '', audioEl.duration);
+                                    this.lastActiveLyricIdx = -1;
+                                    this.renderLyricDOM();
+                                }
+                            };
+                        }
+
+                        // 后台异步拉取官方逐词时间轴，若刚生歌完后台尚未就绪则 6 秒后自动重试一次
                         if (track.isCharSong) {
-                            this.fetchSunoTimelineForTrack(track).then(alignedLines => {
+                            const tryLoadTimeline = async (delayMs = 0) => {
+                                if (delayMs > 0) await new Promise(r => setTimeout(r, delayMs));
+                                const alignedLines = await this.fetchSunoTimelineForTrack(track);
                                 const curPlayingTrack = this.playlistQueue[this.curTrackIdx];
                                 if (alignedLines && alignedLines.length > 0 && curPlayingTrack && curPlayingTrack.id === track.id) {
                                     this.currentLyrics = alignedLines;
                                     this.lastActiveLyricIdx = -1;
                                     this.renderLyricDOM();
                                     const a = document.getElementById('cm-global-audio');
-                                    if (a) this.syncLyricsByTime(a.currentTime || 0, a.duration || track.duration || 120);
+                                    if (a) this.syncLyricsByTime(a.currentTime || 0, a.duration || track.duration || 150);
+                                    return true;
                                 }
+                                return false;
+                            };
+                            tryLoadTimeline(0).then(ok => {
+                                if (!ok) tryLoadTimeline(6000);
                             });
                         }
                         return;
@@ -15676,10 +15769,10 @@ ${titleHint ? `【指定歌名方向】：《${titleHint}》\n` : ''}${userPromp
                         // 判断外层任务是否已经彻底完成（严格对照 CQTAI 官方文档：status === "succeeded"）
                         const isTaskSucceeded = (outerStatus === 'succeeded' || outerStatus === 'success' || outerStatus === 'completed' || outerStatus === 'complete');
 
-                        // 1. 递归扫描 JSON 里所有的歌曲对象，同时统计总共有几个曲目槽位（通常 A/B 共 2 首）
+                        // 1. 递归扫描 JSON 里所有的歌曲对象，提取真实的 clipId 与完成状态
                         let validClips = [];
-                        let totalClipsFound = 0;
-                        const seenAudioUrls = new Set();
+                        let streamingClipsCount = 0;
+                        const seenClipKeys = new Set();
 
                         const scanObj = (obj) => {
                             if (!obj) return;
@@ -15696,32 +15789,38 @@ ${titleHint ? `【指定歌名方向】：《${titleHint}》\n` : ''}${userPromp
                             }
                             if (typeof obj === 'object') {
                                 const clipStatus = String(obj.status || '').toLowerCase();
-                                const audioCandidate = obj.audio_url || obj.audioUrl || obj.song_url || obj.mp3_url || obj.play_url || obj.url || '';
+                                const audioCandidate = obj.audio_url || obj.audioUrl || obj.song_url || obj.mp3_url || obj.play_url || '';
 
-                                // 识别这是一个歌曲片段槽位（排除外层 task 对象本身）
-                                if (obj.entity_type === 'song_schema' || obj.batch_index !== undefined || typeof obj.audio_url === 'string') {
-                                    totalClipsFound++;
+                                let realClipId = obj.id || obj.clip_id || obj.clipId || '';
+                                if ((!realClipId || realClipId === taskId) && typeof audioCandidate === 'string') {
+                                    const uuidMatch = audioCandidate.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+                                    if (uuidMatch) realClipId = uuidMatch[1];
                                 }
 
-                                // 关键修复：每首歌（无论 A 还是 B）必须它自己的状态不是 streaming/submitted/queued，且有真实音频时长或已经 complete，才算真正合成好！
-                                const isStillStreaming = (clipStatus === 'streaming' || clipStatus === 'submitted' || clipStatus === 'queued' || clipStatus === 'processing');
-                                const hasDuration = !!(obj.metadata && Number(obj.metadata.duration) > 0) || Number(obj.duration) > 0;
-                                const isClipComplete = !isStillStreaming && (
-                                    clipStatus === 'complete' ||
-                                    clipStatus === 'completed' ||
-                                    clipStatus === 'succeeded' ||
-                                    (isTaskSucceeded && (hasDuration || !clipStatus))
-                                );
+                                const isSongItem = (obj.entity_type === 'song_schema' || obj.batch_index !== undefined || typeof obj.audio_url === 'string' || typeof obj.audioUrl === 'string');
+                                if (isSongItem && realClipId !== taskId) {
+                                    const isStillStreaming = (clipStatus === 'streaming' || clipStatus === 'submitted' || clipStatus === 'queued' || clipStatus === 'processing');
+                                    const hasDuration = !!(obj.metadata && Number(obj.metadata.duration) > 0) || Number(obj.duration) > 0;
+                                    const isClipComplete = !isStillStreaming && (
+                                        clipStatus === 'complete' ||
+                                        clipStatus === 'completed' ||
+                                        clipStatus === 'succeeded' ||
+                                        (isTaskSucceeded && (hasDuration || !clipStatus))
+                                    );
 
-                                if (isClipComplete && typeof audioCandidate === 'string' && audioCandidate.startsWith('http') && !/\.(jpeg|jpg|png|webp|mp4)(\?|$)/i.test(audioCandidate)) {
-                                    if (!seenAudioUrls.has(audioCandidate)) {
-                                        seenAudioUrls.add(audioCandidate);
-                                        validClips.push(Object.assign({}, obj, {
-                                            id: obj.id || `${taskId}_${validClips.length}`,
-                                            title: obj.title || payload.title,
-                                            audio_url: audioCandidate,
-                                            image_url: obj.image_url || obj.image_large_url || obj.imageUrl || ''
-                                        }));
+                                    if (isStillStreaming) {
+                                        streamingClipsCount++;
+                                    } else if (isClipComplete && typeof audioCandidate === 'string' && audioCandidate.startsWith('http') && !/\.(jpeg|jpg|png|webp|mp4)(\?|$)/i.test(audioCandidate)) {
+                                        const uniqueKey = realClipId || audioCandidate;
+                                        if (!seenClipKeys.has(uniqueKey)) {
+                                            seenClipKeys.add(uniqueKey);
+                                            validClips.push(Object.assign({}, obj, {
+                                                id: realClipId || `${taskId}_${validClips.length}`,
+                                                title: obj.title || payload.title,
+                                                audio_url: audioCandidate,
+                                                image_url: obj.image_url || obj.image_large_url || obj.imageUrl || ''
+                                            }));
+                                        }
                                     }
                                 }
                                 Object.keys(obj).forEach(k => {
@@ -15732,9 +15831,9 @@ ${titleHint ? `【指定歌名方向】：《${titleHint}》\n` : ''}${userPromp
                         scanObj(taskData);
 
                         // 按 batch_index 排序，确保 A 是第 1 首，B 是第 2 首
-                        validClips.sort((a, b) => (a.batch_index || 0) - (b.batch_index || 0));
+                        validClips.sort((a, b) => (a.batch_index ?? 0) - (b.batch_index ?? 0));
 
-                        // 2. 保底：仅当外层状态已经明确为 succeeded 且上面没扫到结构化曲目时，只抓取明确带 .mp3 / .wav 后缀的真实音频链接（杜绝误抓其它网址充当 B）
+                        // 2. 保底：仅当外层状态已经明确为 succeeded 且上面没扫到结构化曲目时，提取真实音频链接
                         if (isTaskSucceeded && validClips.length === 0) {
                             const cleanText = rawInfoText.replace(/\\+/g, '');
                             const allUrls = cleanText.match(/https?:\/\/[^"'\s<>]+/gi) || [];
@@ -15748,30 +15847,33 @@ ${titleHint ? `【指定歌名方向】：《${titleHint}》\n` : ''}${userPromp
                                 }
                             });
                             if (audioUrls.length > 0) {
-                                validClips = audioUrls.map((u, idx) => ({
-                                    id: `${taskId}_${idx}`,
-                                    title: payload.title,
-                                    audio_url: u,
-                                    image_url: imgUrls[idx] || imgUrls[0] || '',
-                                    metadata: { prompt: finalPrompt, duration: 150 }
-                                }));
+                                validClips = audioUrls.map((u, idx) => {
+                                    const m = u.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+                                    return {
+                                        id: m ? m[1] : `${taskId}_${idx}`,
+                                        title: payload.title,
+                                        audio_url: u,
+                                        image_url: imgUrls[idx] || imgUrls[0] || '',
+                                        metadata: { prompt: finalPrompt, duration: 150 }
+                                    };
+                                });
                             }
                         }
 
-                        // 3. 核心同步等待策略：如果任务包含 A/B 两首歌，而目前只有 A 好了（validClips.length === 1），再多等最多 6 轮让 B 也合成完，避免 B 变成半成品死链接！
-                        const expectedClipCount = totalClipsFound >= 2 ? 2 : 1;
-                        if (validClips.length >= expectedClipCount && (isTaskSucceeded || validClips.length >= 2)) {
+                        // 3. 同步等待 A/B 双版本均完全合成完毕再返回
+                        if (validClips.length >= 2 && (isTaskSucceeded || streamingClipsCount === 0)) {
+                            this._singleClipWaitCount = 0;
                             console.log('[Suno] A/B 版本均已完全合成完毕，返回可用音频:', validClips);
                             return validClips;
                         }
 
-                        if (validClips.length === 1 && expectedClipCount >= 2) {
+                        // 若目前只有版本 A 完成，继续等待版本 B 合成（最多等待 20 轮即 60 秒，或外层 succeeded 且无流式任务后再等 4 轮）
+                        if (validClips.length === 1) {
                             this._singleClipWaitCount = (this._singleClipWaitCount || 0) + 1;
-                            this._lastPollStatusText = `版本 A 已就绪，正在等待版本 B 完成 (${this._singleClipWaitCount}/6)`;
-                            // 如果多等了 6 轮（约18秒）B 依然没生成出来，或外层早已 succeeded，则只返回已经能播的 A，不塞入坏的 B
-                            if (this._singleClipWaitCount >= 6 || (isTaskSucceeded && this._singleClipWaitCount >= 2)) {
+                            this._lastPollStatusText = `版本 A 已就绪，正在等待版本 B 完成 (${this._singleClipWaitCount})`;
+                            if (this._singleClipWaitCount >= 20 || (isTaskSucceeded && streamingClipsCount === 0 && this._singleClipWaitCount >= 4)) {
                                 this._singleClipWaitCount = 0;
-                                console.log('[Suno] 版本 B 未生成，仅返回已就绪的版本 A:', validClips);
+                                console.log('[Suno] 返回已就绪的音频:', validClips);
                                 return validClips;
                             }
                             continue;
