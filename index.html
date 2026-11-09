@@ -3990,7 +3990,7 @@ chat: async function(messages, systemPrompt, charId) {
                     // 新增：全局高定黑胶云音与角色原创点歌 听歌 APP
                     'app-music': {
                         type: 'app', w: 1, h: 1, name: '听歌',
-                        svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="2.5"></circle><path d="M14.5 9.5 19 5"></path></svg>',
+                        svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>',
                         action: () => AppNav.goTo('page-music')
                     },
 
@@ -7381,7 +7381,7 @@ chat: async function(messages, systemPrompt, charId) {
                         <div style="display: flex; flex-direction: column; align-items: center; gap: 6px;">
                             <div onclick="window.BeautifySys.triggerUpload('beautify.apps.music')" style="width: 50px; height: 50px; border-radius: 16px; background: #f9f9f9; border: 1px solid #efefef; overflow: hidden; display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative;">
                                 <img id="theme-prv-app-music" style="width: 100%; height: 100%; object-fit: cover; display: none;">
-                                <div id="theme-empty-app-music"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="2.5"></circle><path d="M14.5 9.5 19 5"></path></svg></div>
+                                <div id="theme-empty-app-music"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg></div>
                             </div>
                             <span style="font-size: 11px; color: #555;">听歌</span>
                             <span onclick="window.BeautifySys.clearTarget('beautify.apps.music', event)" style="font-size: 9px; color: #a3a3a3; cursor: pointer;">默认</span>
@@ -8046,7 +8046,7 @@ if (badgeEl) {
                     setBg('cc-edit-stand-prv', this.tempEditData.cc.stand, false); setBg('cc-edit-bg-prv', this.tempEditData.cc.bg, false);
                 },
                 resetAll: function() {
-                    if(!confirm("确定要恢复默认美化吗？所有图片都将被清除。")) return;
+                    if(!confirm("确定要恢复默认美化吗？所有图片都将被清除")) return;
                     appData.beautify = { bg: '', catLeft: '', catRight: '', mainPhoto: '', badge: '', apps: { story: '', wechat: '', weibo: '', forum: '', game: '', live: '' } };
                     
                     // 修复了对应新相框类名
@@ -8468,7 +8468,7 @@ if (badgeEl) {
     },
 
     resetAll: function() {
-        if (!confirm("确定要恢复默认美化吗？所有图片都将被清除。")) return;
+        if (!confirm("确定要恢复默认美化吗？所有图片都将被清除")) return;
         appData.beautify = { 
             bg: '', catLeft: '', catRight: '', mainPhoto: '', badge: '', dockChar: '', dockWb: '', dockSet: '',
             customFontUrl: '', customFontName: '', // 新增字体重置字段
@@ -13286,34 +13286,36 @@ if (badgeEl) {
                 cursor: pointer;
                 user-select: none;
             }
-            /* 唱针 */
+            /* 纯白高定加长唱针（精准搭在黑胶盘面上） */
             .cm-stylus-arm {
                 position: absolute;
-                top: 12px;
+                top: calc(50% - 215px);
                 left: 50%;
-                width: 85px;
-                height: 125px;
-                margin-left: -12px;
-                transform-origin: 14px 14px;
-                transform: rotate(-28deg);
-                transition: transform 0.45s cubic-bezier(0.25, 1, 0.5, 1);
-                z-index: 10;
+                width: 115px;
+                height: 185px;
+                margin-left: -18px;
+                transform-origin: 20px 20px;
+                transform: rotate(-30deg);
+                transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+                z-index: 15;
                 pointer-events: none;
+                filter: drop-shadow(0 8px 16px rgba(0,0,0,0.38));
             }
             .cm-stylus-arm.playing {
-                transform: rotate(0deg);
+                transform: rotate(-2deg);
             }
-            /* 黑胶大圆盘 */
+            /* 黑胶大圆盘（尺寸稍微加大，更大气协调） */
             .cm-vinyl-outer {
-                width: 256px;
-                height: 256px;
+                width: 282px;
+                height: 282px;
                 border-radius: 50%;
                 background: radial-gradient(circle, #111 0%, #1c1c1e 35%, #0d0d0f 36%, #18181b 62%, #0a0a0c 63%, #1c1c1e 100%);
-                box-shadow: 0 16px 48px rgba(0,0,0,0.65), inset 0 0 0 7px rgba(255,255,255,0.06);
+                box-shadow: 0 20px 55px rgba(0,0,0,0.7), inset 0 0 0 8px rgba(255,255,255,0.06);
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 position: relative;
+                margin-top: 14px;
                 animation: cmDiscRotate 20s linear infinite;
                 animation-play-state: paused;
             }
@@ -13321,14 +13323,208 @@ if (badgeEl) {
                 animation-play-state: running;
             }
             .cm-vinyl-cover {
-                width: 166px;
-                height: 166px;
+                width: 184px;
+                height: 184px;
                 border-radius: 50%;
                 background-size: cover;
                 background-position: center;
                 background-color: #2c2c2e;
                 border: 3px solid #111;
                 box-shadow: inset 0 0 12px rgba(0,0,0,0.5);
+            }
+
+            /* 创作页经过设计的自定义下拉选择框与弹窗 */
+            .cm-custom-select-wrap {
+                position: relative;
+                width: 100%;
+                user-select: none;
+            }
+            .cm-custom-select-trigger {
+                width: 100%;
+                height: 40px;
+                border-radius: 12px;
+                border: 1px solid #e5e5ea;
+                padding: 0 12px;
+                font-size: 13px;
+                background: #f9f9fb;
+                color: #1c1c1e;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                cursor: pointer;
+                box-sizing: border-box;
+                transition: all 0.2s ease;
+            }
+            .cm-custom-select-trigger:active {
+                background: #f0f1f5;
+            }
+            .cm-custom-dropdown-menu {
+                position: absolute;
+                top: calc(100% + 6px);
+                left: 0;
+                width: 100%;
+                min-width: 135px;
+                max-height: 220px;
+                overflow-y: auto;
+                background: rgba(255, 255, 255, 0.98);
+                backdrop-filter: blur(24px);
+                -webkit-backdrop-filter: blur(24px);
+                border-radius: 14px;
+                border: 0.5px solid rgba(0,0,0,0.08);
+                box-shadow: 0 12px 32px rgba(0,0,0,0.14);
+                z-index: 95;
+                display: none;
+                flex-direction: column;
+                padding: 5px;
+                box-sizing: border-box;
+                animation: fadeIn 0.16s ease;
+            }
+            .cm-custom-dropdown-menu.show {
+                display: flex;
+            }
+            .cm-custom-dropdown-item {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                padding: 8px 10px;
+                border-radius: 10px;
+                font-size: 13px;
+                color: #1c1c1e;
+                cursor: pointer;
+                transition: background 0.15s;
+            }
+            .cm-custom-dropdown-item:hover, .cm-custom-dropdown-item:active {
+                background: #f2f3f7;
+            }
+            .cm-custom-dropdown-item.selected {
+                background: rgba(230, 57, 70, 0.08);
+                color: #e63946;
+                font-weight: 700;
+            }
+
+            /* 歌单详情左右打通无边距样式与左滑删除 */
+            .cm-song-list.flush-edge {
+                margin: 0 !important;
+                border-radius: 0 !important;
+                border-left: none !important;
+                border-right: none !important;
+                padding: 0 !important;
+                box-shadow: none !important;
+            }
+            .cm-song-swipe-wrap {
+                position: relative;
+                overflow: hidden;
+                width: 100%;
+                background: #ffffff;
+                border-bottom: 0.5px solid #f2f2f5;
+            }
+            .cm-song-swipe-wrap:last-child {
+                border-bottom: none;
+            }
+            .cm-song-del-btn {
+                position: absolute;
+                top: 0;
+                right: 0;
+                bottom: 0;
+                width: 78px;
+                background: #ff3b30;
+                color: #ffffff;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 3px;
+                font-size: 12px;
+                font-weight: 700;
+                cursor: pointer;
+                z-index: 1;
+                user-select: none;
+                opacity: 0;
+                visibility: hidden;
+                transition: opacity 0.2s ease, visibility 0.2s ease;
+            }
+            .cm-song-swipe-wrap.revealed .cm-song-del-btn {
+                opacity: 1;
+                visibility: visible;
+            }
+            .cm-song-swipe-content {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                padding: 10px 16px;
+                background: #ffffff;
+                position: relative;
+                z-index: 2;
+                width: 100%;
+                box-sizing: border-box;
+                transition: transform 0.25s cubic-bezier(0.18, 0.89, 0.32, 1);
+                cursor: pointer;
+                user-select: none;
+                touch-action: pan-y;
+            }
+            .cm-song-swipe-wrap.revealed .cm-song-swipe-content {
+                transform: translateX(-78px);
+            }
+
+            /* 播放页左下角三点气泡弹出菜单（高定毛玻璃精致版） */
+            .cm-more-popover-menu {
+                position: absolute;
+                bottom: 44px;
+                left: 0;
+                min-width: 214px;
+                background: rgba(30, 30, 36, 0.86);
+                backdrop-filter: blur(32px) saturate(180%);
+                -webkit-backdrop-filter: blur(32px) saturate(180%);
+                border-radius: 18px;
+                border: 0.5px solid rgba(255, 255, 255, 0.14);
+                box-shadow: 0 16px 40px rgba(0, 0, 0, 0.52), inset 0 0.5px 0 rgba(255, 255, 255, 0.18);
+                padding: 5px;
+                display: none;
+                flex-direction: column;
+                z-index: 180;
+                transform-origin: bottom left;
+                animation: fadeIn 0.16s cubic-bezier(0.2, 0.9, 0.3, 1);
+            }
+            .cm-more-popover-menu.show {
+                display: flex;
+            }
+            .cm-more-popover-item {
+                display: flex;
+                align-items: center;
+                gap: 11px;
+                padding: 10.5px 13px;
+                border-radius: 13px;
+                color: rgba(255, 255, 255, 0.94);
+                font-size: 13px;
+                font-weight: 500;
+                letter-spacing: 0.2px;
+                cursor: pointer;
+                transition: background 0.15s ease, transform 0.1s ease;
+                white-space: nowrap;
+                position: relative;
+            }
+            .cm-more-popover-item:not(:last-child)::after {
+                content: '';
+                position: absolute;
+                bottom: 0;
+                left: 40px;
+                right: 12px;
+                height: 0.5px;
+                background: rgba(255, 255, 255, 0.07);
+                pointer-events: none;
+            }
+            .cm-more-popover-item:hover,
+            .cm-more-popover-item:active {
+                background: rgba(255, 255, 255, 0.11);
+            }
+            .cm-more-popover-item svg {
+                width: 16px;
+                height: 16px;
+                flex-shrink: 0;
+                color: rgba(255, 255, 255, 0.85);
+                stroke-width: 1.8;
+                stroke-linecap: round;
+                stroke-linejoin: round;
             }
 
             /* 歌词滚动视图 */
@@ -13362,26 +13558,39 @@ if (badgeEl) {
                 text-shadow: 0 2px 12px rgba(255,255,255,0.25);
             }
 
-            /* 「我的」页面头部与歌单卡片 */
+            /* 「我的」页面头部：高定高斯模糊液态玻璃背景 */
             .cm-me-banner {
-                height: 195px;
-                background: linear-gradient(135deg, #2d3436 0%, #1e272e 100%);
+                height: 205px;
+                background:
+                    radial-gradient(circle at 18% 22%, rgba(255, 165, 185, 0.55) 0%, transparent 50%),
+                    radial-gradient(circle at 84% 28%, rgba(162, 195, 255, 0.6) 0%, transparent 54%),
+                    radial-gradient(circle at 52% 82%, rgba(215, 185, 255, 0.5) 0%, transparent 55%),
+                    linear-gradient(135deg, #2b3040 0%, #1d2230 100%);
                 background-size: cover;
                 background-position: center;
                 position: relative;
                 display: flex;
                 flex-direction: column;
                 justify-content: flex-end;
-                padding: 20px 18px;
+                padding: 22px 18px;
                 color: #ffffff;
                 box-sizing: border-box;
+                overflow: hidden;
             }
             .cm-me-banner::before {
                 content: '';
                 position: absolute;
                 inset: 0;
-                background: linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.65) 100%);
+                background: rgba(255, 255, 255, 0.08);
+                backdrop-filter: blur(26px) saturate(140%);
+                -webkit-backdrop-filter: blur(26px) saturate(140%);
+                border-bottom: 0.5px solid rgba(255, 255, 255, 0.22);
                 pointer-events: none;
+            }
+            .cm-me-banner.has-custom-bg::before {
+                background: linear-gradient(180deg, rgba(0,0,0,0.12) 0%, rgba(0,0,0,0.58) 100%);
+                backdrop-filter: none;
+                -webkit-backdrop-filter: none;
             }
             .cm-playlist-card {
                 background: #ffffff;
@@ -13459,16 +13668,16 @@ if (badgeEl) {
 
         <!-- 听歌 APP 主容器 -->
         <div id="page-music" class="page-module">
-            <!-- 顶栏：返回桌面 + 搜索框 + 设置按钮 -->
+            <!-- 顶栏：返回桌面 + 搜索框（搜索按钮置于输入框内部右侧） -->
             <div class="cm-top-header" id="cm-top-header-bar">
                 <div onclick="AppNav.goHome()" style="cursor:pointer; display:flex; align-items:center; color:#1c1c1e; padding-right:2px;">
                     <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
                 </div>
-                <div class="cm-search-pill">
+                <div class="cm-search-pill" style="padding-right: 6px;">
                     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#8e8e93" stroke-width="2" style="flex-shrink:0;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                     <textarea id="cm-search-input" rows="1" placeholder="搜索歌名、歌手..." onkeydown="if(event.key==='Enter'){event.preventDefault();window.MusicAppSys.execSearch();}"></textarea>
+                    <div onclick="window.MusicAppSys.execSearch()" style="font-size:12.5px; font-weight:700; color:#e63946; cursor:pointer; flex-shrink:0; padding:3px 10px; border-radius:12px; background:rgba(230,57,70,0.08);">搜索</div>
                 </div>
-                <div onclick="window.MusicAppSys.execSearch()" style="font-size:13px; font-weight:600; color:#e63946; cursor:pointer; flex-shrink:0;">搜索</div>
             </div>
 
             <!-- 1. 首页：发现与推荐页 -->
@@ -13481,7 +13690,7 @@ if (badgeEl) {
                         <div style="font-size:11.5px; color:rgba(255,255,255,0.72); margin-top:4px;">支持角色写词、声线克隆与双版本黑胶收录 ›</div>
                     </div>
                     <div style="width:52px; height:52px; border-radius:26px; background:rgba(255,255,255,0.12); display:flex; align-items:center; justify-content:center; flex-shrink:0; z-index:2;">
-                        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#fff" stroke-width="1.8"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="2.5"></circle><path d="M14.5 9.5 19 5"></path></svg>
+                        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
                     </div>
                 </div>
 
@@ -13497,7 +13706,10 @@ if (badgeEl) {
                 <!-- 歌曲展示区标题 -->
                 <div style="padding: 4px 20px 8px 20px; display:flex; justify-content:space-between; align-items:center;">
                     <span style="font-size:15px; font-weight:700; color:#1c1c1e;" id="cm-home-list-title">每日精选曲库</span>
-                    <span style="font-size:11.5px; color:#8e8e93;" id="cm-home-list-sub">点击即可黑胶播放</span>
+                    <div id="cm-home-list-sub" onclick="window.MusicAppSys.refreshRecommendSongs()" style="display:flex; align-items:center; gap:4px; font-size:12px; font-weight:600; color:#e63946; cursor:pointer; padding:4px 10px; border-radius:12px; background:rgba(230,57,70,0.08); user-select:none;">
+                        <svg id="cm-refresh-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="transition:transform 0.35s ease;"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                        <span>换一批</span>
+                    </div>
                 </div>
 
                 <!-- 歌曲列表容器 -->
@@ -13515,36 +13727,60 @@ if (badgeEl) {
                         <span style="font-size:11px; background:#fff0f1; color:#e63946; padding:4px 10px; border-radius:12px; font-weight:700;">Suno 引擎</span>
                     </div>
 
-                    <!-- 选择演唱角色 -->
+                    <!-- 选择演唱角色（带自动裁剪小头像与异步加载的高定下拉弹窗） -->
                     <div>
                         <div style="font-size:12px; font-weight:600; color:#555; margin-bottom:6px;">选择演唱角色</div>
-                        <select id="cm-create-char-sel" onchange="window.MusicAppSys.onCreateCharChange(this.value)" style="width:100%; height:38px; border-radius:10px; border:1px solid #e5e5ea; padding:0 12px; font-size:13.5px; background:#f9f9fb; color:#1c1c1e; outline:none;"></select>
+                        <input type="hidden" id="cm-create-char-sel" value="">
+                        <div class="cm-custom-select-wrap" id="cm-dd-wrap-char">
+                            <div class="cm-custom-select-trigger" onclick="window.MusicAppSys.toggleCreateDropdown('char', event)">
+                                <div style="display:flex; align-items:center; gap:9px; min-width:0; flex:1;">
+                                    <div id="cm-create-char-trigger-avatar" style="width:26px; height:26px; border-radius:50%; background-color:#e5e5ea; background-size:cover; background-position:center; flex-shrink:0; border:0.5px solid rgba(0,0,0,0.06);"></div>
+                                    <span id="cm-create-char-trigger-name" style="font-size:13.5px; font-weight:600; color:#1c1c1e; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">选择角色</span>
+                                </div>
+                                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#8e8e93" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                            </div>
+                            <div class="cm-custom-dropdown-menu" id="cm-dd-menu-char"></div>
+                        </div>
                     </div>
 
-                    <!-- 角色声音 ID、声线性别与演唱语种 -->
+                    <!-- 角色声音 ID、声线性别（默认男声）与演唱语种（高定下拉弹窗） -->
                     <div style="display:flex; gap:8px;">
-                        <div style="flex:1;">
+                        <div style="flex:1; min-width:0;">
                             <div style="font-size:11.5px; color:#8e8e93; margin-bottom:4px;">人声性别</div>
-                            <select id="cm-create-gender" style="width:100%; height:36px; border-radius:10px; border:1px solid #e5e5ea; padding:0 8px; font-size:12.5px; background:#f9f9fb; color:#1c1c1e; outline:none;">
-                                <option value="m">男声 (m)</option>
-                                <option value="f">女声 (f)</option>
-                            </select>
+                            <input type="hidden" id="cm-create-gender" value="m">
+                            <div class="cm-custom-select-wrap" id="cm-dd-wrap-gender">
+                                <div class="cm-custom-select-trigger" style="height:36px; padding:0 9px; border-radius:10px;" onclick="window.MusicAppSys.toggleCreateDropdown('gender', event)">
+                                    <span id="cm-create-gender-trigger-txt" style="font-size:12.5px; font-weight:600; color:#1c1c1e; white-space:nowrap;">男声 (m)</span>
+                                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#8e8e93" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                                </div>
+                                <div class="cm-custom-dropdown-menu" id="cm-dd-menu-gender">
+                                    <div class="cm-custom-dropdown-item selected" data-val="m" onclick="window.MusicAppSys.selectCreateGender('m', '男声 (m)')"><span>男声 (m)</span></div>
+                                    <div class="cm-custom-dropdown-item" data-val="f" onclick="window.MusicAppSys.selectCreateGender('f', '女声 (f)')"><span>女声 (f)</span></div>
+                                </div>
+                            </div>
                         </div>
-                        <div style="flex:1.1;">
+                        <div style="flex:1.15; min-width:0;">
                             <div style="font-size:11.5px; color:#8e8e93; margin-bottom:4px;">演唱语种</div>
-                            <select id="cm-create-lang" style="width:100%; height:36px; border-radius:10px; border:1px solid #e5e5ea; padding:0 8px; font-size:12.5px; background:#f9f9fb; color:#1c1c1e; outline:none;">
-                                <option value="Chinese">中文 (国语)</option>
-                                <option value="Japanese">日语 (Japanese)</option>
-                                <option value="Cantonese">粤语 (Cantonese)</option>
-                                <option value="English">英语 (English)</option>
-                                <option value="Korean">韩语 (Korean)</option>
-                                <option value="French">法语 (French)</option>
-                                <option value="Russian">俄语 (Russian)</option>
-                                <option value="German">德语 (German)</option>
-                                <option value="Spanish">西班牙语 (Spanish)</option>
-                            </select>
+                            <input type="hidden" id="cm-create-lang" value="Chinese">
+                            <div class="cm-custom-select-wrap" id="cm-dd-wrap-lang">
+                                <div class="cm-custom-select-trigger" style="height:36px; padding:0 9px; border-radius:10px;" onclick="window.MusicAppSys.toggleCreateDropdown('lang', event)">
+                                    <span id="cm-create-lang-trigger-txt" style="font-size:12.5px; font-weight:600; color:#1c1c1e; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">中文 (国语)</span>
+                                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#8e8e93" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                                </div>
+                                <div class="cm-custom-dropdown-menu" id="cm-dd-menu-lang" style="min-width:155px;">
+                                    <div class="cm-custom-dropdown-item selected" data-val="Chinese" onclick="window.MusicAppSys.selectCreateLang('Chinese', '中文 (国语)')"><span>中文 (国语)</span></div>
+                                    <div class="cm-custom-dropdown-item" data-val="Japanese" onclick="window.MusicAppSys.selectCreateLang('Japanese', '日语 (Japanese)')"><span>日语 (Japanese)</span></div>
+                                    <div class="cm-custom-dropdown-item" data-val="Cantonese" onclick="window.MusicAppSys.selectCreateLang('Cantonese', '粤语 (Cantonese)')"><span>粤语 (Cantonese)</span></div>
+                                    <div class="cm-custom-dropdown-item" data-val="English" onclick="window.MusicAppSys.selectCreateLang('English', '英语 (English)')"><span>英语 (English)</span></div>
+                                    <div class="cm-custom-dropdown-item" data-val="Korean" onclick="window.MusicAppSys.selectCreateLang('Korean', '韩语 (Korean)')"><span>韩语 (Korean)</span></div>
+                                    <div class="cm-custom-dropdown-item" data-val="French" onclick="window.MusicAppSys.selectCreateLang('French', '法语 (French)')"><span>法语 (French)</span></div>
+                                    <div class="cm-custom-dropdown-item" data-val="Russian" onclick="window.MusicAppSys.selectCreateLang('Russian', '俄语 (Russian)')"><span>俄语 (Russian)</span></div>
+                                    <div class="cm-custom-dropdown-item" data-val="German" onclick="window.MusicAppSys.selectCreateLang('German', '德语 (German)')"><span>德语 (German)</span></div>
+                                    <div class="cm-custom-dropdown-item" data-val="Spanish" onclick="window.MusicAppSys.selectCreateLang('Spanish', '西班牙语 (Spanish)')"><span>西班牙语 (Spanish)</span></div>
+                                </div>
+                            </div>
                         </div>
-                        <div style="flex:1.4;">
+                        <div style="flex:1.35; min-width:0;">
                             <div style="font-size:11.5px; color:#8e8e93; margin-bottom:4px;">声线 ID (选填)</div>
                             <textarea id="cm-create-persona-id" rows="1" placeholder="personaId" style="width:100%; height:36px; line-height:20px; border-radius:10px; border:1px solid #e5e5ea; padding:7px 8px; font-size:12px; background:#f9f9fb; color:#1c1c1e; outline:none; resize:none; overflow:hidden; box-sizing:border-box; font-family:monospace;"></textarea>
                         </div>
@@ -13591,6 +13827,9 @@ if (badgeEl) {
                     </div>
 
                     <button onclick="window.MusicAppSys.submitManualCreateSong()" style="width:100%; padding:13px 0; border-radius:14px; border:none; background:linear-gradient(135deg, #e63946 0%, #d62828 100%); color:#ffffff; font-size:14.5px; font-weight:700; cursor:pointer; box-shadow:0 6px 18px rgba(230, 57, 70, 0.28);">开始录制歌曲</button>
+                    <div style="font-size:11px; color:#8e8e93; text-align:left; line-height:1.5; padding:0 2px;">
+                        * 角色生成的云端歌曲为临时链接（24小时后失效），如需长期保留，请在生成后进入全屏黑胶播放页点击左下角「⋯」下载到本地或永久缓存至浏览器。
+                    </div>
                 </div>
             </div>
 
@@ -13603,15 +13842,15 @@ if (badgeEl) {
                         <span>评论设置</span>
                     </div>
 
-                    <!-- 用户头像与面具切换 -->
+                    <!-- 用户高清大头像与面具切换 -->
                     <div style="position:relative; z-index:4; display:flex; align-items:center; gap:14px;" onclick="event.stopPropagation(); window.MusicAppSys.openUserSwitchModal();">
-                        <div id="cm-me-user-avatar" style="width:62px; height:62px; border-radius:50%; background-color:#f0f0f0; background-size:cover; background-position:center; border:2.5px solid #ffffff; box-shadow:0 4px 14px rgba(0,0,0,0.25); flex-shrink:0;"></div>
+                        <div id="cm-me-user-avatar" style="width:68px; height:68px; border-radius:50%; background-color:rgba(255,255,255,0.2); background-size:cover; background-position:center; border:2.5px solid rgba(255,255,255,0.92); box-shadow:0 6px 18px rgba(0,0,0,0.28); flex-shrink:0;"></div>
                         <div style="flex:1; min-width:0;">
                             <div style="display:flex; align-items:center; gap:8px;">
-                                <span id="cm-me-user-name" style="font-size:18px; font-weight:800; color:#ffffff;">User</span>
+                                <span id="cm-me-user-name" style="font-size:18px; font-weight:800; color:#ffffff; text-shadow:0 1px 6px rgba(0,0,0,0.25);">User</span>
                                 <span style="font-size:10.5px; background:rgba(255,255,255,0.22); padding:2px 8px; border-radius:10px; backdrop-filter:blur(6px);">切换面具 ▾</span>
                             </div>
-                            <div style="font-size:11.5px; color:rgba(255,255,255,0.75); margin-top:4px;">点击背景图可更换封面 · 各面具歌单独立保存</div>
+                            <div style="font-size:11.5px; color:rgba(255,255,255,0.82); margin-top:4px;">点击背景图可更换封面 · 各面具歌单独立保存</div>
                         </div>
                     </div>
                 </div>
@@ -13626,8 +13865,8 @@ if (badgeEl) {
                 </div>
             </div>
 
-            <!-- 歌单详情子视图抽屉 -->
-            <div id="cm-playlist-detail-view" style="position:absolute; inset:0; background:#f6f6f8; z-index:80; display:none; flex-direction:column;">
+            <!-- 歌单详情子视图抽屉（左右打通无留白设计） -->
+            <div id="cm-playlist-detail-view" style="position:absolute; inset:0; background:#ffffff; z-index:80; display:none; flex-direction:column;">
                 <div class="cm-top-header">
                     <div onclick="document.getElementById('cm-playlist-detail-view').style.display='none'" style="cursor:pointer; display:flex; align-items:center; color:#1c1c1e;">
                         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
@@ -13635,8 +13874,8 @@ if (badgeEl) {
                     <div style="flex:1; text-align:center; font-size:15.5px; font-weight:700; color:#1c1c1e;" id="cm-pl-detail-title">歌单详情</div>
                     <div style="width:22px;"></div>
                 </div>
-                <div style="flex:1; overflow-y:auto; padding:14px 16px calc(120px + env(safe-area-inset-bottom, 0px)) 16px;">
-                    <div class="cm-song-list" id="cm-pl-detail-songs"></div>
+                <div style="flex:1; overflow-y:auto; padding:0 0 calc(120px + env(safe-area-inset-bottom, 0px)) 0;">
+                    <div class="cm-song-list flush-edge" id="cm-pl-detail-songs"></div>
                 </div>
             </div>
 
@@ -13679,8 +13918,8 @@ if (badgeEl) {
                         <div id="cm-fp-title" style="font-size:16px; font-weight:700; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">未播放</div>
                         <div id="cm-fp-artist" style="font-size:12px; color:rgba(255,255,255,0.68); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">未知歌手</div>
                     </div>
-                    <div onclick="window.MusicAppSys.openAddToPlaylistModal()" style="cursor:pointer; padding:4px;" title="收藏到歌单">
-                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    <div onclick="window.MusicAppSys.openShareSongToChatModal()" style="cursor:pointer; padding:4px;" title="分享到聊天">
+                        <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
                     </div>
                 </div>
 
@@ -13688,21 +13927,24 @@ if (badgeEl) {
                 <div class="cm-fp-stage" onclick="window.MusicAppSys.toggleVinylAndLyricView()">
                     <!-- 视图A：黑胶唱机 -->
                     <div id="cm-fp-vinyl-view" style="width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; position:relative;">
+                        <!-- 纯白高定加长唱针（无黑色，自然搭在黑胶唱片纹理上） -->
                         <div class="cm-stylus-arm" id="cm-fp-stylus">
-                            <svg viewBox="0 0 100 140" width="85" height="125">
-                                <circle cx="14" cy="14" r="11" fill="#d1d5db" stroke="#333" stroke-width="3"/>
-                                <path d="M14 14 L18 72 L46 112" fill="none" stroke="#e5e5ea" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-                                <rect x="40" y="106" width="14" height="20" rx="3" transform="rotate(-32 46 112)" fill="#262626" stroke="#d1d5db" stroke-width="1.5"/>
+                            <svg viewBox="0 0 120 190" width="115" height="185" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="20" cy="20" r="16" fill="rgba(255,255,255,0.22)"/>
+                                <circle cx="20" cy="20" r="11" fill="#ffffff"/>
+                                <circle cx="20" cy="20" r="4" fill="#e5e5ea"/>
+                                <path d="M20 20 L23 96 C23.5 108 28 118 36 127 L64 156" stroke="#ffffff" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                <g transform="rotate(-43 66 158)">
+                                    <rect x="57" y="146" width="16" height="25" rx="4" fill="#ffffff"/>
+                                    <rect x="61" y="151" width="8" height="10" rx="1.5" fill="#e5e5ea"/>
+                                    <line x1="73" y1="163" x2="78" y2="163" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
+                                </g>
                             </svg>
                         </div>
                         <div class="cm-vinyl-outer" id="cm-fp-disc">
                             <div class="cm-vinyl-cover" id="cm-fp-cover"></div>
                         </div>
-                        <div style="display:flex; align-items:center; justify-content:center; gap:10px; margin-top:14px;">
-                            <div id="cm-fp-ab-switch" style="display:none; background:rgba(255,255,255,0.14); padding:5px 14px; border-radius:14px; font-size:11.5px; color:#fff; font-weight:600; cursor:pointer;" onclick="event.stopPropagation(); window.MusicAppSys.switchSongABVersion();">切换版本 A / B</div>
-                            <div id="cm-fp-persona-btn" style="display:none; background:rgba(230,57,70,0.28); border:0.5px solid rgba(255,117,143,0.45); padding:5px 14px; border-radius:14px; font-size:11.5px; color:#ffccd5; font-weight:600; cursor:pointer;" onclick="event.stopPropagation(); window.MusicAppSys.getOrCreateCurrentTrackPersonaId();">获取声音 ID</div>
-                        </div>
-                        <div id="cm-fp-inline-lyric" style="margin-top:16px; padding:0 24px; font-size:13.5px; color:rgba(255,255,255,0.85); text-align:center; min-height:22px;">点击黑胶可切换全屏歌词</div>
+                        <div id="cm-fp-inline-lyric" style="margin-top:24px; padding:0 24px; font-size:13.5px; color:rgba(255,255,255,0.85); text-align:center; min-height:22px;">点击黑胶可切换全屏歌词</div>
                     </div>
 
                    <!-- 视图B：全屏滚动歌词 -->
@@ -13711,18 +13953,43 @@ if (badgeEl) {
 
                 <!-- 底部进度条与控制面板 -->
                 <div style="position:relative; z-index:5; padding: 4px 22px calc(24px + env(safe-area-inset-bottom, 0px)) 22px;">
-                    <!-- 播放条上方操作栏：左侧圆圈三点(复制歌词)，右侧心形(xw+)与评论(999+)并列 -->
+                    <!-- 播放条上方操作栏：左侧圆圈三点(弹出多功能小菜单：复制歌词/切换AB/获取声音ID)，右侧心形与评论并列 -->
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; padding:0 2px;">
-                        <div onclick="window.MusicAppSys.openCopyLyricsModal()" style="cursor:pointer; display:flex; align-items:center; justify-content:center; padding:4px 4px 4px 0; color:rgba(255,255,255,0.88);" title="更多操作 / 复制歌词">
-                            <svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                                <circle cx="12" cy="12" r="10"></circle>
-                                <circle cx="8" cy="12" r="1" fill="currentColor"></circle>
-                                <circle cx="12" cy="12" r="1" fill="currentColor"></circle>
-                                <circle cx="16" cy="12" r="1" fill="currentColor"></circle>
-                            </svg>
+                        <div style="position:relative; display:flex; align-items:center;">
+                            <div onclick="window.MusicAppSys.toggleMoreActionsMenu(event)" style="cursor:pointer; display:flex; align-items:center; justify-content:center; padding:4px 4px 4px 0; color:rgba(255,255,255,0.88);" title="更多操作">
+                                <svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <circle cx="8" cy="12" r="1" fill="currentColor"></circle>
+                                    <circle cx="12" cy="12" r="1" fill="currentColor"></circle>
+                                    <circle cx="16" cy="12" r="1" fill="currentColor"></circle>
+                                </svg>
+                            </div>
+                            <!-- 圆圈三点上方弹出的设计感小菜单 -->
+                            <div class="cm-more-popover-menu" id="cm-fp-more-menu" onclick="event.stopPropagation()">
+                                <div class="cm-more-popover-item" onclick="window.MusicAppSys.closeMoreActionsMenu(); window.MusicAppSys.confirmCopyCurrentLyrics();">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="9" y="9" width="11" height="11" rx="2.5"></rect><path d="M5 15H4.5A1.5 1.5 0 0 1 3 13.5v-9A1.5 1.5 0 0 1 4.5 3h9A1.5 1.5 0 0 1 15 4.5V5"></path></svg>
+                                    <span>复制完整歌词</span>
+                                </div>
+                                <div class="cm-more-popover-item" id="cm-fp-ab-switch" style="display:none;" onclick="window.MusicAppSys.closeMoreActionsMenu(); window.MusicAppSys.switchSongABVersion();">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="17 3 21 7 17 11"></polyline><path d="M3 11V9a2 2 0 0 1 2-2h16"></path><polyline points="7 21 3 17 7 13"></polyline><path d="M21 13v2a2 2 0 0 1-2 2H3"></path></svg>
+                                    <span id="cm-fp-ab-switch-txt">切换版本 A / B</span>
+                                </div>
+                                <div class="cm-more-popover-item" id="cm-fp-persona-btn" style="display:none;" onclick="window.MusicAppSys.closeMoreActionsMenu(); window.MusicAppSys.getOrCreateCurrentTrackPersonaId();">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M18 11a6 6 0 0 1-12 0"></path><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                                    <span id="cm-fp-persona-btn-txt">获取声音 ID</span>
+                                </div>
+                                <div class="cm-more-popover-item" id="cm-fp-cache-btn" onclick="window.MusicAppSys.closeMoreActionsMenu(); window.MusicAppSys.manualCacheCurrentSong();">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path><path d="M12 12v9"></path><path d="m8 17 4 4 4-4"></path></svg>
+                                    <span id="cm-fp-cache-btn-txt">缓存歌曲到本地</span>
+                                </div>
+                                <div class="cm-more-popover-item" id="cm-fp-download-btn" onclick="window.MusicAppSys.closeMoreActionsMenu(); window.MusicAppSys.manualDownloadCurrentSong();">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3"></path><polyline points="8 11 12 15 16 11"></polyline><line x1="12" y1="15" x2="12" y2="4"></line></svg>
+                                    <span id="cm-fp-download-btn-txt">下载歌曲到本地</span>
+                                </div>
+                            </div>
                         </div>
                         <div style="display:flex; align-items:center; gap:26px; padding-right:8px;">
-                            <div onclick="window.MusicAppSys.toggleLikeCurrentSong()" style="cursor:pointer; position:relative; display:flex; align-items:center; justify-content:center; padding:4px;">
+                            <div onclick="window.MusicAppSys.openAddToPlaylistModal()" style="cursor:pointer; position:relative; display:flex; align-items:center; justify-content:center; padding:4px;" title="收藏到歌单">
                                 <span id="cm-fp-like-btn" style="display:flex; align-items:center; justify-content:center;">
                                     <svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="#fff" stroke-width="1.9"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
                                 </span>
@@ -13813,6 +14080,21 @@ if (badgeEl) {
                 </div>
             </div>
 
+            <!-- 缓存歌曲到本地：经过设计的双选项引导弹窗 -->
+            <div id="modal-cm-cache-guide" class="ins-modal" style="z-index:168; background:rgba(0,0,0,0.58); display:none; align-items:center; justify-content:center; position:absolute !important; inset:0;">
+                <div style="background:#ffffff; width:86%; max-width:315px; border-radius:22px; padding:22px 20px; box-shadow:0 18px 45px rgba(0,0,0,0.32); text-align:center; animation:fadeIn 0.2s ease;">
+                    <div style="width:46px; height:46px; border-radius:23px; background:rgba(230,57,70,0.1); color:#e63946; display:flex; align-items:center; justify-content:center; margin:0 auto 12px auto;">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                    </div>
+                    <div id="cm-cache-guide-title" style="font-size:16px; font-weight:800; color:#1c1c1e; margin-bottom:8px;">缓存歌曲到本地</div>
+                    <div id="cm-cache-guide-desc" style="font-size:12.5px; color:#666; line-height:1.55; margin-bottom:18px;">请先通过菜单中的「下载到本地」保存音频文件，再选择该文件即可永久缓存至浏览器，永不过期。</div>
+                    <div style="display:flex; flex-direction:column; gap:10px;">
+                        <button onclick="window.MusicAppSys.pickLocalAudioFileToCache()" style="width:100%; padding:12px 14px; border-radius:12px; border:none; background:linear-gradient(135deg, #e63946 0%, #d62828 100%); color:#ffffff; font-size:13.5px; font-weight:700; cursor:pointer; box-shadow:0 6px 16px rgba(230,57,70,0.25);">已下载到本地，选择文件缓存</button>
+                        <button onclick="document.getElementById('modal-cm-cache-guide').style.display='none'" style="width:100%; padding:11px 14px; border-radius:12px; border:none; background:#f2f3f7; color:#555555; font-size:13px; font-weight:600; cursor:pointer;">还未下载，先去点击下载</button>
+                    </div>
+                </div>
+            </div>
+
             <!-- 歌曲评论区抽屉弹窗 -->
             <div id="cm-comments-drawer" class="ins-modal" style="z-index:140; background:rgba(0,0,0,0.5); display:none; align-items:flex-end; justify-content:center; position:absolute !important; inset:0;">
                 <div style="background:#ffffff; width:100%; height:78%; border-radius:24px 24px 0 0; display:flex; flex-direction:column; overflow:hidden; animation:fadeIn 0.2s ease;">
@@ -13886,6 +14168,45 @@ if (badgeEl) {
                     <button onclick="document.getElementById('modal-cm-add-to-pl').style.display='none'" style="width:100%; padding:10px; border-radius:10px; border:none; background:#f0f0f0; color:#555; font-size:13.5px; font-weight:600; cursor:pointer;">取消</button>
                 </div>
             </div>
+
+            <!-- 分享歌曲到聊天好友弹窗 -->
+            <div id="modal-cm-share-to-chat" class="ins-modal" style="z-index:168; background:rgba(0,0,0,0.55); display:none; align-items:center; justify-content:center; position:absolute !important; inset:0;">
+                <div style="background:#ffffff; width:86%; max-width:320px; border-radius:22px; padding:20px; box-shadow:0 18px 45px rgba(0,0,0,0.3); display:flex; flex-direction:column; max-height:76%; animation:fadeIn 0.2s ease;">
+                    <div style="font-size:16px; font-weight:800; color:#1c1c1e; text-align:center; margin-bottom:4px;">分享歌曲到聊天</div>
+                    <div id="cm-share-song-sub" style="font-size:11.5px; color:#8e8e93; text-align:center; margin-bottom:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">选择要分享的聊天会话</div>
+                    <div id="cm-share-chat-list" style="flex:1; overflow-y:auto; border:1px solid #efefef; border-radius:14px; padding:4px 10px; margin-bottom:14px; max-height:250px;"></div>
+                    <button onclick="document.getElementById('modal-cm-share-to-chat').style.display='none'" style="width:100%; padding:11px; border-radius:12px; border:none; background:#f2f3f7; color:#555; font-size:13.5px; font-weight:600; cursor:pointer;">取消</button>
+                </div>
+            </div>
+
+            <!-- 歌单歌曲左滑删除确认弹窗 -->
+            <div id="modal-cm-delete-song-confirm" class="ins-modal" style="z-index:170; background:rgba(0,0,0,0.55); display:none; align-items:center; justify-content:center; position:absolute !important; inset:0;">
+                <div style="background:#ffffff; width:84%; max-width:305px; border-radius:22px; padding:22px 20px; box-shadow:0 18px 45px rgba(0,0,0,0.3); text-align:center; animation:fadeIn 0.2s ease;">
+                    <div style="width:44px; height:44px; border-radius:22px; background:rgba(255,59,48,0.1); color:#ff3b30; display:flex; align-items:center; justify-content:center; margin:0 auto 12px auto;">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    </div>
+                    <div style="font-size:16px; font-weight:800; color:#1c1c1e; margin-bottom:8px;">移除歌曲</div>
+                    <div id="cm-del-song-confirm-desc" style="font-size:12.5px; color:#666; line-height:1.55; margin-bottom:18px;">确定要将这首歌曲从歌单中删除吗？</div>
+                    <div style="display:flex; gap:10px;">
+                        <button onclick="window.MusicAppSys.cancelDeletePlaylistSong()" style="flex:1; padding:11px; border-radius:10px; border:none; background:#f0f0f0; color:#555; font-size:13.5px; font-weight:600; cursor:pointer;">取消</button>
+                        <button onclick="window.MusicAppSys.confirmDeletePlaylistSong()" style="flex:1; padding:11px; border-radius:10px; border:none; background:#ff3b30; color:#fff; font-size:13.5px; font-weight:600; cursor:pointer;">确定删除</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 全局常驻弹窗：角色生成歌曲 24 小时临时链接提醒（听歌与聊天通用） -->
+        <div id="modal-suno-temp-link-notice" class="ins-modal" style="z-index:100075; background:rgba(0,0,0,0.6); display:none; align-items:center; justify-content:center; position:fixed !important; inset:0;">
+            <div style="background:linear-gradient(145deg, #222228 0%, #151519 100%); width:85%; max-width:315px; border-radius:24px; padding:24px 20px; color:#ffffff; text-align:center; box-shadow:0 20px 55px rgba(0,0,0,0.5); border:0.5px solid rgba(255,255,255,0.16); animation:fadeIn 0.25s ease;">
+                <div style="width:48px; height:48px; border-radius:24px; background:rgba(230,57,70,0.18); color:#ff758f; display:flex; align-items:center; justify-content:center; margin:0 auto 14px auto; border:0.5px solid rgba(255,117,143,0.3);">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+                </div>
+                <div id="suno-temp-notice-title" style="font-size:16px; font-weight:800; color:#ffffff; margin-bottom:8px;">歌曲录制完成 · 临时链接提醒</div>
+                <div style="font-size:12.5px; color:rgba(255,255,255,0.78); line-height:1.6; margin-bottom:20px; text-align:left; background:rgba(255,255,255,0.06); padding:12px 14px; border-radius:14px; border:0.5px solid rgba(255,255,255,0.08);">
+                    角色生成的云端歌曲音频为<b>临时链接（24小时后失效）</b>。<br><br>如需长期永久保存，请在<b>听歌 APP 全屏黑胶播放页</b>点击左下角<b>「⋯」</b>按钮，选择<b>「下载歌曲到本地」</b>并<b>「缓存歌曲到本地」</b>（含 A/B 版本）。
+                </div>
+                <button onclick="document.getElementById('modal-suno-temp-link-notice').style.display='none'" style="width:100%; padding:12px 0; border-radius:14px; border:none; background:linear-gradient(135deg, #e63946 0%, #d62828 100%); color:#ffffff; font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 6px 18px rgba(230,57,70,0.32);">我知道了</button>
+            </div>
         </div>
 
         <!-- 全局高定设计：歌曲正在录制请勿退出锁定小弹窗（聊天与听歌共用） -->
@@ -13931,16 +14252,88 @@ if (badgeEl) {
                             activeUserId: appData.settings.activeUserId || 'default',
                             commentCharIds: [],
                             songComments: {},
+                            dailyRecCache: {},
                             profiles: {}
                         };
                     }
                     if (!appData.musicApp.profiles) appData.musicApp.profiles = {};
                     if (!appData.musicApp.songComments) appData.musicApp.songComments = {};
+                    if (!appData.musicApp.dailyRecCache) appData.musicApp.dailyRecCache = {};
                     if (!Array.isArray(appData.musicApp.commentCharIds)) {
                         appData.musicApp.commentCharIds = (appData.charCards || []).filter(c => !c.isNPC).slice(0, 3).map(c => c.id);
                     }
                     this.currentUserId = appData.musicApp.activeUserId || appData.settings.activeUserId || 'default';
                     this.ensureUserProfile(this.currentUserId);
+                    this.recoverAndSyncAllCharSongs();
+                },
+
+                // 自动扫描微信聊天记录与所有面具分支，无损找回并修复以前角色写的所有歌曲存档
+                recoverAndSyncAllCharSongs: function() {
+                    if (!appData.musicApp || !appData.musicApp.profiles) return;
+                    const activeProf = this.ensureUserProfile(this.currentUserId);
+                    if (!Array.isArray(activeProf.charSongs)) activeProf.charSongs = [];
+
+                    const fixSongClipIds = (song) => {
+                        if (!song) return;
+                        if ((!song.clipId || song.clipId.includes('_')) && song.audioUrl) {
+                            const mA = String(song.audioUrl).match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+                            if (mA) song.clipId = mA[1];
+                        }
+                        if ((!song.clipIdB || song.clipIdB.includes('_')) && song.audioUrlB) {
+                            const mB = String(song.audioUrlB).match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+                            if (mB) song.clipIdB = mB[1];
+                        }
+                    };
+
+                    // 1. 先修复当前面具歌单里已有的角色歌曲 clipId
+                    activeProf.charSongs.forEach(s => fixSongClipIds(s));
+
+                    let hasRecovered = false;
+
+                    // 2. 如果其他面具分支（如 default 或 u_default）里存有角色歌曲而当前面具缺失，自动汇总过来防止因面具ID切换导致看不见
+                    Object.keys(appData.musicApp.profiles).forEach(uid => {
+                        const p = appData.musicApp.profiles[uid];
+                        if (p && Array.isArray(p.charSongs)) {
+                            p.charSongs.forEach(s => {
+                                if (s && s.audioUrl) {
+                                    fixSongClipIds(s);
+                                    if (!activeProf.charSongs.some(exist => exist.id === s.id || exist.audioUrl === s.audioUrl)) {
+                                        activeProf.charSongs.push(JSON.parse(JSON.stringify(s)));
+                                        hasRecovered = true;
+                                    }
+                                }
+                            });
+                        }
+                    });
+
+                    // 3. 深度扫描所有微信聊天记录里的角色黑胶唱歌气泡 (char_song)，把曾经生成成功但歌单里丢失的歌曲全部找回！
+                    if (Array.isArray(appData.chats)) {
+                        appData.chats.forEach(chat => {
+                            (chat.messages || []).forEach(msg => {
+                                if (msg && msg.type === 'char_song' && msg.songData && msg.songData.audioUrl) {
+                                    const sd = msg.songData;
+                                    fixSongClipIds(sd);
+                                    const chatUid = (chat.settings && chat.settings.linkedUser && chat.settings.linkedUser !== 'default')
+                                        ? chat.settings.linkedUser
+                                        : this.currentUserId;
+                                    const targetProf = this.ensureUserProfile(chatUid);
+                                    if (!targetProf.charSongs.some(exist => exist.id === sd.id || exist.audioUrl === sd.audioUrl)) {
+                                        targetProf.charSongs.unshift(JSON.parse(JSON.stringify(sd)));
+                                        hasRecovered = true;
+                                    }
+                                    if (!activeProf.charSongs.some(exist => exist.id === sd.id || exist.audioUrl === sd.audioUrl)) {
+                                        activeProf.charSongs.unshift(JSON.parse(JSON.stringify(sd)));
+                                        hasRecovered = true;
+                                    }
+                                }
+                            });
+                        });
+                    }
+
+                    if (hasRecovered) {
+                        activeProf.charSongs.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+                        saveMusicData();
+                    }
                 },
 
                 ensureUserProfile: function(uid) {
@@ -14027,14 +14420,177 @@ if (badgeEl) {
                     if (tab === 'create') this.populateCreateCharSelect();
                 },
 
-                // ==================== 首页搜索与推荐 ====================
-                loadRecommendCategory: async function(kw, chipEl) {
+                getTodayDateKey: function() {
+                    const d = new Date();
+                    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                },
+
+                // ==================== 首页搜索与官方真实热歌榜推荐（支持一键换一批） ====================
+                currentRecommendKw: '热歌榜',
+                _hotChartFullPool: [],
+
+                // 从曲库池中随机洗牌抽取 n 首歌曲
+                _pickRandomSongs: function(pool, count = 25) {
+                    if (!Array.isArray(pool) || pool.length <= count) return [...(pool || [])];
+                    const copy = [...pool];
+                    for (let i = copy.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        const temp = copy[i];
+                        copy[i] = copy[j];
+                        copy[j] = temp;
+                    }
+                    return copy.slice(0, count);
+                },
+
+                // 拉取网易云官方真实热歌榜 (ID: 3778678) 完整曲库池
+                fetchOfficialHotChartPool: async function(forceRefresh = false) {
+                    if (!forceRefresh && Array.isArray(this._hotChartFullPool) && this._hotChartFullPool.length > 30) {
+                        return this._hotChartFullPool;
+                    }
+                    const chartId = '3778678'; // 网易云官方热歌榜 ID
+                    const fetchWithTimeout = async (url, ms = 5500) => {
+                        const ctrl = new AbortController();
+                        const timer = setTimeout(() => ctrl.abort(), ms);
+                        try {
+                            const res = await fetch(url, { signal: ctrl.signal });
+                            clearTimeout(timer);
+                            return res;
+                        } catch (err) {
+                            clearTimeout(timer);
+                            throw err;
+                        }
+                    };
+
+                    const endpoints = [
+                        `https://zm.armoe.cn/playlist/track/all?id=${chartId}&limit=150&offset=0`,
+                        `https://ncm.zhenxin.me/playlist/track/all?id=${chartId}&limit=150&offset=0`,
+                        `https://music-api.heheda.top/playlist/detail?id=${chartId}`,
+                        `https://zm.armoe.cn/playlist/detail?id=${chartId}`,
+                        `https://api.injahow.cn/meting/?type=playlist&id=${chartId}`,
+                        `https://api.i-meto.com/meting/api?server=netease&type=playlist&id=${chartId}`,
+                        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent('https://music.163.com/api/v6/playlist/detail?id=' + chartId + '&n=150')}`
+                    ];
+
+                    let rawTracks = [];
+                    for (let ep of endpoints) {
+                        try {
+                            const res = await fetchWithTimeout(ep, 5500);
+                            if (!res.ok) continue;
+                            const data = await res.json();
+                            if (Array.isArray(data.songs) && data.songs.length > 0) {
+                                rawTracks = data.songs;
+                                break;
+                            } else if (data?.playlist?.tracks && data.playlist.tracks.length > 0) {
+                                rawTracks = data.playlist.tracks;
+                                break;
+                            } else if (Array.isArray(data) && data.length > 0) {
+                                rawTracks = data.map(item => {
+                                    const sidMatch = String(item.url || item.id || '').match(/id=(\d+)/);
+                                    const sid = sidMatch ? sidMatch[1] : String(item.id || Date.now());
+                                    return {
+                                        id: sid,
+                                        name: item.name || item.title || '未知歌曲',
+                                        ar: [{ name: item.artist || item.author || '未知歌手' }],
+                                        al: { picUrl: item.pic || item.cover || '' },
+                                        fee: 0,
+                                        dt: 210000
+                                    };
+                                });
+                                break;
+                            }
+                        } catch (e) {}
+                    }
+
+                    if (rawTracks.length === 0) return [];
+
+                    // 优先筛选非 VIP (fee !== 1 && fee !== 4) 的可播热歌；若数量不足则补充完整列表
+                    const freeTracks = rawTracks.filter(s => s.fee !== 1 && s.fee !== 4);
+                    const sourcePool = freeTracks.length >= 25 ? freeTracks : rawTracks;
+
+                    const normalizedPool = sourcePool.map(s => {
+                        const artists = (s.ar || s.artists || []).map(a => a.name).join(' / ') || '未知歌手';
+                        let rawPic = (s.al && s.al.picUrl) || (s.album && s.album.picUrl) || '';
+                        rawPic = rawPic.replace(/^http:\/\//i, 'https://');
+                        let cover = '';
+                        if (rawPic) {
+                            cover = rawPic.includes('?') ? rawPic : `${rawPic}?param=300y300`;
+                        } else if (s.id) {
+                            cover = `https://api.injahow.cn/meting/?type=pic&id=${s.id}`;
+                        }
+                        return {
+                            id: 'cloud_' + s.id,
+                            songId: String(s.id),
+                            title: s.name || '未知歌曲',
+                            artist: artists,
+                            cover: cover,
+                            audioUrl: `https://music.163.com/song/media/outer/url?id=${s.id}.mp3`,
+                            duration: Math.floor((s.dt || s.duration || 180000) / 1000),
+                            isCharSong: false
+                        };
+                    });
+
+                    this._hotChartFullPool = normalizedPool;
+                    return normalizedPool;
+                },
+
+                loadRecommendCategory: async function(kw, chipEl, forceRandom = false) {
+                    this.currentRecommendKw = kw || '热歌榜';
                     if (chipEl) {
                         document.querySelectorAll('#cm-home-cat-chips .cm-cat-chip').forEach(c => c.classList.remove('active'));
                         chipEl.classList.add('active');
                     }
-                    document.getElementById('cm-home-list-title').innerText = `${kw} · 精选推荐`;
-                    await this.searchAndRenderSongs(kw);
+                    document.getElementById('cm-home-list-title').innerText = `${this.currentRecommendKw} · 精选推荐`;
+
+                    this.initData();
+                    const todayKey = this.getTodayDateKey();
+                    const cacheObj = appData.musicApp.dailyRecCache[this.currentRecommendKw];
+
+                    // 如果不是点击“换一批”且今日已有缓存（同时校验不是旧版残留的伪热歌榜数据），直接秒开展示
+                    if (!forceRandom && cacheObj && cacheObj.date === todayKey && Array.isArray(cacheObj.songs) && cacheObj.songs.length > 0 && (this.currentRecommendKw !== '热歌榜' || cacheObj.isOfficialChart)) {
+                        this._currentHomeDisplaySongs = cacheObj.songs;
+                        const listEl = document.getElementById('cm-home-song-list');
+                        if (listEl) listEl.innerHTML = this.buildSongListHtml(cacheObj.songs, 'home');
+                        return;
+                    }
+
+                    const listEl = document.getElementById('cm-home-song-list');
+                    if (this.currentRecommendKw === '热歌榜') {
+                        if (listEl) {
+                            listEl.innerHTML = `
+                                <div style="display:flex; align-items:center; justify-content:center; gap:8px; padding:36px 0; color:#8e8e93; font-size:12.5px;">
+                                    <div class="st-music-loading-spinner"></div>
+                                    <span>正在同步实时热歌榜...</span>
+                                </div>`;
+                        }
+                        const pool = await this.fetchOfficialHotChartPool();
+                        if (pool && pool.length > 0) {
+                            const picked = this._pickRandomSongs(pool, 25);
+                            this._currentHomeDisplaySongs = picked;
+                            appData.musicApp.dailyRecCache['热歌榜'] = {
+                                date: todayKey,
+                                isOfficialChart: true,
+                                songs: picked
+                            };
+                            saveMusicData();
+                            if (listEl) listEl.innerHTML = this.buildSongListHtml(picked, 'home');
+                            return;
+                        }
+                    }
+
+                    // 其他分类标签或兜底情况，支持随机偏移换一批
+                    await this.searchAndRenderSongs(this.currentRecommendKw, true, forceRandom);
+                },
+
+                // 点击右上角「换一批」触发重新随机抽取热歌
+                refreshRecommendSongs: async function() {
+                    const iconEl = document.getElementById('cm-refresh-icon');
+                    if (iconEl) {
+                        this._refreshRot = (this._refreshRot || 0) + 360;
+                        iconEl.style.transform = `rotate(${this._refreshRot}deg)`;
+                    }
+                    const kw = this.currentRecommendKw || '热歌榜';
+                    await this.loadRecommendCategory(kw, null, true);
+                    this.showToast('已为你换一批热门歌曲');
                 },
 
                 execSearch: async function() {
@@ -14046,7 +14602,7 @@ if (badgeEl) {
                     await this.searchAndRenderSongs(kw);
                 },
 
-                searchAndRenderSongs: async function(kw) {
+                searchAndRenderSongs: async function(kw, isDailyRecommend = false, shufflePick = false) {
                     const listEl = document.getElementById('cm-home-song-list');
                     if (!listEl) return;
 
@@ -14060,12 +14616,12 @@ if (badgeEl) {
                         </div>`;
 
                     // 7条多源高可用搜歌通道（国内镜像 + 国际代理直连网易云官网 + Meting聚合源）
-                    const neteasePcUrl = 'https://music.163.com/api/cloudsearch/pc?s=' + encodeURIComponent(kw) + '&type=1&offset=0&limit=80';
-                    const neteaseWebUrl = 'https://music.163.com/api/search/get/web?s=' + encodeURIComponent(kw) + '&type=1&offset=0&total=true&limit=80';
+                    const neteasePcUrl = 'https://music.163.com/api/cloudsearch/pc?s=' + encodeURIComponent(kw) + '&type=1&offset=0&limit=100';
+                    const neteaseWebUrl = 'https://music.163.com/api/search/get/web?s=' + encodeURIComponent(kw) + '&type=1&offset=0&total=true&limit=100';
                     const endpoints = [
-                        `https://zm.armoe.cn/cloudsearch?keywords=${encodeURIComponent(kw)}&limit=80&offset=0&type=1`,
-                        `https://ncm.zhenxin.me/cloudsearch?keywords=${encodeURIComponent(kw)}&limit=80&offset=0&type=1`,
-                        `https://music-api.heheda.top/cloudsearch?keywords=${encodeURIComponent(kw)}&limit=80&offset=0&type=1`,
+                        `https://zm.armoe.cn/cloudsearch?keywords=${encodeURIComponent(kw)}&limit=100&offset=0&type=1`,
+                        `https://ncm.zhenxin.me/cloudsearch?keywords=${encodeURIComponent(kw)}&limit=100&offset=0&type=1`,
+                        `https://music-api.heheda.top/cloudsearch?keywords=${encodeURIComponent(kw)}&limit=100&offset=0&type=1`,
                         `https://corsproxy.io/?${encodeURIComponent(neteasePcUrl)}`,
                         `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(neteasePcUrl)}`,
                         `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(neteaseWebUrl)}`,
@@ -14117,9 +14673,12 @@ if (badgeEl) {
                     // 如果在等待期间用户已经发起了新的搜索，丢弃旧结果
                     if (reqSeq !== this._searchReqSeq) return;
 
-                    // 优先筛选非 VIP (fee !== 1 && fee !== 4) 的完全免费可播曲目；若全部为 VIP 则保底展示原列表前 25 首
+                    // 优先筛选非 VIP (fee !== 1 && fee !== 4) 的完全免费可播曲目；若触发换一批则随机抽取 25 首
                     let freeSongs = rawSongs.filter(s => s.fee !== 1 && s.fee !== 4);
-                    let finalSongs = (freeSongs.length > 0 ? freeSongs : rawSongs).slice(0, 25);
+                    let candidateList = freeSongs.length > 0 ? freeSongs : rawSongs;
+                    let finalSongs = (shufflePick || isDailyRecommend)
+                        ? this._pickRandomSongs(candidateList, 25)
+                        : candidateList.slice(0, 25);
 
                     if (finalSongs.length === 0) {
                         listEl.innerHTML = `<div style="text-align:center; padding:36px 0; color:#8e8e93; font-size:12.5px;">未搜到相关歌曲，请换个关键词试试</div>`;
@@ -14151,6 +14710,14 @@ if (badgeEl) {
                     });
 
                     this._currentHomeDisplaySongs = normalized;
+                    if (isDailyRecommend && normalized.length > 0) {
+                        this.initData();
+                        appData.musicApp.dailyRecCache[kw] = {
+                            date: this.getTodayDateKey(),
+                            songs: normalized
+                        };
+                        saveMusicData();
+                    }
                     listEl.innerHTML = this.buildSongListHtml(normalized, 'home');
                 },
 
@@ -14158,19 +14725,180 @@ if (badgeEl) {
                     if (!songs || songs.length === 0) {
                         return `<div style="text-align:center; padding:36px 0; color:#8e8e93; font-size:12.5px;">歌单暂无歌曲</div>`;
                     }
+                    if (sourceKey === 'playlist') {
+                        return songs.map((s, idx) => {
+                            const coverStyle = s.cover ? `background-image:url('${s.cover}');` : '';
+                            return `
+                            <div class="cm-song-swipe-wrap" id="cm-pl-swipe-${idx}">
+                                <div class="cm-song-del-btn" onclick="window.MusicAppSys.promptDeletePlaylistSong(${idx}, event)">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                    <span>删除</span>
+                                </div>
+                                <div class="cm-song-swipe-content"
+                                     ontouchstart="window.MusicAppSys.onSongSwipeStart(event, ${idx})"
+                                     ontouchmove="window.MusicAppSys.onSongSwipeMove(event, ${idx})"
+                                     ontouchend="window.MusicAppSys.onSongSwipeEnd(event, ${idx})"
+                                     onmousedown="window.MusicAppSys.onSongSwipeStart(event, ${idx})"
+                                     onclick="window.MusicAppSys.onPlaylistSongItemClick(${idx}, event)">
+                                    <div class="cm-song-cover" style="${coverStyle}"></div>
+                                    <div class="cm-song-info">
+                                        <div class="cm-song-title">${s.title}</div>
+                                        <div class="cm-song-artist"><span>${s.artist || '未知歌手'}</span></div>
+                                    </div>
+                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#c7c7cc" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                                </div>
+                            </div>`;
+                        }).join('');
+                    }
                     return songs.map((s, idx) => {
                         const coverStyle = s.cover ? `background-image:url('${s.cover}');` : '';
-                        const badge = s.isCharSong ? `<span class="cm-ai-badge">${s.charName || 'TA'}演唱</span>` : '';
                         return `
                         <div class="cm-song-item" onclick="window.MusicAppSys.playFromList('${sourceKey}', ${idx})">
                             <div class="cm-song-cover" style="${coverStyle}"></div>
                             <div class="cm-song-info">
                                 <div class="cm-song-title">${s.title}</div>
-                                <div class="cm-song-artist">${badge}<span>${s.artist || '未知歌手'}</span></div>
+                                <div class="cm-song-artist"><span>${s.artist || '未知歌手'}</span></div>
                             </div>
                             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#c7c7cc" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
                         </div>`;
                     }).join('');
+                },
+
+                _songSwipeStartX: 0,
+                _songSwipeStartY: 0,
+                _activeSongSwipeIdx: null,
+                _justSongSwipedUntil: 0,
+                pendingDeleteSongIdx: null,
+
+                resetRevealedSongRows: function() {
+                    document.querySelectorAll('.cm-song-swipe-wrap.revealed').forEach(el => {
+                        el.classList.remove('revealed');
+                    });
+                },
+
+                onSongSwipeStart: function(e, idx) {
+                    this._activeSongSwipeIdx = idx;
+                    const pt = e.touches ? e.touches[0] : e;
+                    this._songSwipeStartX = pt.clientX;
+                    this._songSwipeStartY = pt.clientY;
+                    if (!e.touches) {
+                        const onMove = (me) => this.onSongSwipeMove(me, idx);
+                        const onUp = (me) => {
+                            this.onSongSwipeEnd(me, idx);
+                            document.removeEventListener('mousemove', onMove);
+                            document.removeEventListener('mouseup', onUp);
+                        };
+                        document.addEventListener('mousemove', onMove);
+                        document.addEventListener('mouseup', onUp);
+                    }
+                },
+
+                onSongSwipeMove: function(e, idx) {
+                    if (this._activeSongSwipeIdx !== idx) return;
+                    const pt = e.touches ? e.touches[0] : e;
+                    const dx = pt.clientX - this._songSwipeStartX;
+                    const dy = pt.clientY - this._songSwipeStartY;
+                    if (Math.abs(dy) > Math.abs(dx)) return;
+                    const wrap = document.getElementById(`cm-pl-swipe-${idx}`);
+                    if (!wrap) return;
+                    if (dx < -22) {
+                        if (!wrap.classList.contains('revealed')) {
+                            this.resetRevealedSongRows();
+                            wrap.classList.add('revealed');
+                            this._justSongSwipedUntil = Date.now() + 450;
+                        }
+                    } else if (dx > 22) {
+                        if (wrap.classList.contains('revealed')) {
+                            wrap.classList.remove('revealed');
+                            this._justSongSwipedUntil = Date.now() + 300;
+                        }
+                    }
+                },
+
+                onSongSwipeEnd: function() {
+                    this._activeSongSwipeIdx = null;
+                },
+
+                onPlaylistSongItemClick: function(idx, e) {
+                    if (Date.now() < this._justSongSwipedUntil) return;
+                    const wrap = document.getElementById(`cm-pl-swipe-${idx}`);
+                    if (wrap && wrap.classList.contains('revealed')) {
+                        wrap.classList.remove('revealed');
+                        return;
+                    }
+                    const anyRevealed = document.querySelector('.cm-song-swipe-wrap.revealed');
+                    if (anyRevealed) {
+                        this.resetRevealedSongRows();
+                        return;
+                    }
+                    this.playFromList('playlist', idx);
+                },
+
+                promptDeletePlaylistSong: function(idx, e) {
+                    if (e) e.stopPropagation();
+                    const songs = this._currentPlaylistViewSongs || [];
+                    const song = songs[idx];
+                    if (!song) return;
+                    this.pendingDeleteSongIdx = idx;
+                    const descEl = document.getElementById('cm-del-song-confirm-desc');
+                    if (descEl) {
+                        if (song.isCharSong || song.audioUrlB) {
+                            descEl.innerHTML = `确定要将《<b>${song.title}</b>》从歌单中删除吗？<br><span style="font-size:11.5px; color:#ff3b30;">该歌曲的A/B双版本及本地缓存也将一并清除</span>`;
+                        } else {
+                            descEl.innerHTML = `确定要将《<b>${song.title}</b>》从当前歌单中删除吗？`;
+                        }
+                    }
+                    document.getElementById('modal-cm-delete-song-confirm').style.display = 'flex';
+                },
+
+                cancelDeletePlaylistSong: function() {
+                    document.getElementById('modal-cm-delete-song-confirm').style.display = 'none';
+                    this.pendingDeleteSongIdx = null;
+                    this.resetRevealedSongRows();
+                },
+
+                confirmDeletePlaylistSong: async function() {
+                    const idx = this.pendingDeleteSongIdx;
+                    document.getElementById('modal-cm-delete-song-confirm').style.display = 'none';
+                    this.pendingDeleteSongIdx = null;
+                    const songs = this._currentPlaylistViewSongs || [];
+                    if (idx === null || idx === undefined || !songs[idx]) return;
+
+                    const targetSong = songs[idx];
+                    songs.splice(idx, 1);
+
+                    // 如果是角色生成的歌曲（或从《TA为我唱的歌》删除），同步清理 A/B 双版本本地 IndexedDB 音频缓存与评论缓存
+                    if (targetSong.isCharSong || this.activePlaylistId === '__char_songs__') {
+                        try {
+                            const db = await this._openAudioCacheDB();
+                            if (db) {
+                                const clipA = this.extractSongClipId(Object.assign({}, targetSong, { activeVer: 'A' }));
+                                const clipB = this.extractSongClipId(Object.assign({}, targetSong, { activeVer: 'B' }));
+                                const keysToRemove = [
+                                    `suno_audio_${clipA || targetSong.id}_A`,
+                                    `suno_audio_${clipB || targetSong.id}_B`,
+                                    `suno_audio_${targetSong.id}_A`,
+                                    `suno_audio_${targetSong.id}_B`
+                                ];
+                                await new Promise((resolve) => {
+                                    const tx = db.transaction('audios', 'readwrite');
+                                    const store = tx.objectStore('audios');
+                                    keysToRemove.forEach(k => { try { store.delete(k); } catch (err) {} });
+                                    tx.oncomplete = () => resolve();
+                                    tx.onerror = () => resolve();
+                                });
+                            }
+                        } catch (e) {}
+
+                        if (appData.musicApp && appData.musicApp.songComments && appData.musicApp.songComments[targetSong.id]) {
+                            delete appData.musicApp.songComments[targetSong.id];
+                        }
+                    }
+
+                    saveMusicData();
+                    document.getElementById('cm-pl-detail-songs').innerHTML = this.buildSongListHtml(songs, 'playlist');
+                    this.renderMePage();
+                    this.showToast('已从歌单中删除');
                 },
 
                 playFromList: function(sourceKey, idx) {
@@ -14190,10 +14918,296 @@ if (badgeEl) {
                     if (openFull) this.openFullPlayer();
                 },
 
+                // 本地 IndexedDB 音频永久缓存读写器（彻底解决中转站 24 小时 S3 链接过期问题）
+                _openAudioCacheDB: function() {
+                    return new Promise((resolve) => {
+                        if (!window.indexedDB) return resolve(null);
+                        const req = window.indexedDB.open('SunoAudioPermanentCacheDB', 1);
+                        req.onupgradeneeded = (e) => {
+                            const db = e.target.result;
+                            if (!db.objectStoreNames.contains('audios')) {
+                                db.createObjectStore('audios');
+                            }
+                        };
+                        req.onsuccess = (e) => resolve(e.target.result);
+                        req.onerror = () => resolve(null);
+                    });
+                },
+
+                getLocalCachedAudioBlobUrl: async function(cacheKey) {
+                    if (!cacheKey) return '';
+                    try {
+                        const db = await this._openAudioCacheDB();
+                        if (!db) return '';
+                        return await new Promise((resolve) => {
+                            const tx = db.transaction('audios', 'readonly');
+                            const req = tx.objectStore('audios').get(cacheKey);
+                            req.onsuccess = () => {
+                                if (req.result instanceof Blob && req.result.size > 1000) {
+                                    resolve(URL.createObjectURL(req.result));
+                                } else {
+                                    resolve('');
+                                }
+                            };
+                            req.onerror = () => resolve('');
+                        });
+                    } catch (e) {
+                        return '';
+                    }
+                },
+
+                // 直接将二进制 Blob / File 写入本地 IndexedDB 永久缓存
+                saveAudioBlobToLocalDB: async function(cacheKey, blobObj) {
+                    if (!cacheKey || !blobObj || blobObj.size < 10000) return false;
+                    try {
+                        const db = await this._openAudioCacheDB();
+                        if (!db) return false;
+                        await new Promise((resolve, reject) => {
+                            const tx = db.transaction('audios', 'readwrite');
+                            tx.objectStore('audios').put(blobObj, cacheKey);
+                            tx.oncomplete = () => resolve(true);
+                            tx.onerror = (err) => reject(err);
+                        });
+                        return true;
+                    } catch (e) {
+                        return false;
+                    }
+                },
+
+                cacheAudioUrlToLocalDB: async function(cacheKey, remoteUrl) {
+                    if (!cacheKey || !remoteUrl || !remoteUrl.startsWith('http')) return false;
+                    if (!this._cachingKeys) this._cachingKeys = new Set();
+                    if (this._cachingKeys.has(cacheKey)) return false;
+
+                    // 注意：如果链接是带 X-Amz-Signature 签名的亚马逊 S3 链接，不能经过会解码 %2F 的代理，只對非签名直链追加代理
+                    const isAwsSigned = remoteUrl.includes('X-Amz-Signature=');
+                    const fetchEndpoints = isAwsSigned
+                        ? [remoteUrl]
+                        : [
+                            remoteUrl,
+                            `https://corsproxy.io/?${encodeURIComponent(remoteUrl)}`,
+                            `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(remoteUrl)}`
+                        ];
+
+                    try {
+                        this._cachingKeys.add(cacheKey);
+                        for (let ep of fetchEndpoints) {
+                            try {
+                                const ctrl = new AbortController();
+                                const timer = setTimeout(() => ctrl.abort(), 30000);
+                                const res = await fetch(ep, { signal: ctrl.signal });
+                                clearTimeout(timer);
+                                if (!res.ok) continue;
+                                const blob = await res.blob();
+                                if (blob && blob.size > 20000 && !blob.type.includes('xml') && !blob.type.includes('json') && !blob.type.includes('html')) {
+                                    return await this.saveAudioBlobToLocalDB(cacheKey, blob);
+                                }
+                            } catch (innerErr) {}
+                        }
+                    } catch (e) {
+                    } finally {
+                        this._cachingKeys.delete(cacheKey);
+                    }
+                    return false;
+                },
+
+                // 获取当前歌曲当前版本 (A或B) 的缓存 Key 与真实音频 URL
+                _getCurrentTrackCacheInfo: function(track) {
+                    if (!track) return { cacheKey: '', playUrl: '', curVer: 'A', curClipId: '' };
+                    const curVer = track.activeVer || 'A';
+                    const playUrl = (curVer === 'B' && track.audioUrlB) ? track.audioUrlB : track.audioUrl;
+                    let rawClipId = (curVer === 'B' && track.clipIdB) ? track.clipIdB : track.clipId;
+                    let curClipId = (rawClipId && !rawClipId.includes('_')) ? rawClipId : '';
+                    if (!curClipId) {
+                        const m = String(playUrl || track.id || track.cover || '').match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+                        if (m) curClipId = m[1];
+                    }
+                    const cacheKey = `suno_audio_${curClipId || track.id}_${curVer}`;
+                    return { cacheKey, playUrl, curVer, curClipId };
+                },
+
+                // 手动点击菜单：弹出经过设计的「缓存歌曲到本地」引导弹窗
+                manualCacheCurrentSong: async function() {
+                    const track = this.playlistQueue[this.curTrackIdx];
+                    if (!track) return this.showToast('当前没有正在播放的歌曲');
+                    const { cacheKey, curVer } = this._getCurrentTrackCacheInfo(track);
+                    const verLabel = (track.isCharSong || track.audioUrlB) ? ` (版本${curVer})` : '';
+
+                    const existingBlobUrl = await this.getLocalCachedAudioBlobUrl(cacheKey);
+                    const titleEl = document.getElementById('cm-cache-guide-title');
+                    const descEl = document.getElementById('cm-cache-guide-desc');
+                    if (titleEl) {
+                        titleEl.innerText = existingBlobUrl ? `重新缓存歌曲${verLabel}` : `缓存歌曲到本地${verLabel}`;
+                    }
+                    if (descEl) {
+                        if (existingBlobUrl) {
+                            URL.revokeObjectURL(existingBlobUrl);
+                            descEl.innerText = `《${track.title}》${verLabel} 当前已缓存过。如需替换更新缓存，可重新选择已下载到本地的音频文件：`;
+                        } else {
+                            descEl.innerText = `即将为《${track.title}》${verLabel} 建立浏览器永久缓存。若还未下载音频，请先去菜单点击「下载到本地」；若已下载，请直接选择本地音频文件：`;
+                        }
+                    }
+                    const modal = document.getElementById('modal-cm-cache-guide');
+                    if (modal) modal.style.display = 'flex';
+                },
+
+                // 在缓存引导弹窗中点击「已下载到本地，选择文件缓存」：读取本地文件并写入当前版本 (A或B) 的 IndexedDB
+                pickLocalAudioFileToCache: function() {
+                    const modal = document.getElementById('modal-cm-cache-guide');
+                    if (modal) modal.style.display = 'none';
+
+                    const track = this.playlistQueue[this.curTrackIdx];
+                    if (!track) return this.showToast('当前没有正在播放的歌曲');
+                    const { cacheKey, curVer } = this._getCurrentTrackCacheInfo(track);
+                    const verLabel = (track.isCharSong || track.audioUrlB) ? ` (版本${curVer})` : '';
+
+                    const fileInp = document.createElement('input');
+                    fileInp.type = 'file';
+                    fileInp.accept = 'audio/*,.mp3,.m4a,.wav,.mp4,.ogg,.aac,.flac';
+                    fileInp.onchange = async (ev) => {
+                        const file = ev.target.files && ev.target.files[0];
+                        if (!file) return;
+                        const saved = await this.saveAudioBlobToLocalDB(cacheKey, file);
+                        if (saved) {
+                            this.showToast(`《${track.title}》${verLabel} 已永久缓存到浏览器！`);
+                            // 如果当前歌曲因为过期没播出来，缓存成功后立刻从本地缓存开始播放
+                            const curPlaying = this.playlistQueue[this.curTrackIdx];
+                            if (curPlaying && curPlaying.id === track.id && !this.isPlaying) {
+                                this.playTrackAtIndex(this.curTrackIdx);
+                            }
+                        } else {
+                            this.showToast('所选文件无效或体积过小，缓存失败');
+                        }
+                    };
+                    fileInp.click();
+                },
+
+                // 手动点击菜单：将当前歌曲当前版本 (A或B) 下载成音频文件 (.mp3 / .m4a) 到手机/电脑本地
+                manualDownloadCurrentSong: async function() {
+                    const track = this.playlistQueue[this.curTrackIdx];
+                    if (!track) return this.showToast('当前没有正在播放的歌曲');
+                    const { cacheKey, playUrl, curVer, curClipId } = this._getCurrentTrackCacheInfo(track);
+                    const verLabel = (track.isCharSong || track.audioUrlB) ? `_${curVer}` : '';
+                    const safeTitle = String(track.title || '歌曲').replace(/[\\/:*?"<>|]/g, '_');
+                    const safeArtist = String(track.artist || '歌手').replace(/[\\/:*?"<>|]/g, '_');
+
+                    const triggerFileDownload = (hrefUrl, extName = 'mp3') => {
+                        const a = document.createElement('a');
+                        a.href = hrefUrl;
+                        a.download = `${safeTitle}-${safeArtist}${verLabel}.${extName}`;
+                        a.target = '_blank';
+                        document.body.appendChild(a);
+                        a.click();
+                        setTimeout(() => document.body.removeChild(a), 300);
+                    };
+
+                    // 1. 如果本地 IndexedDB 已经缓存过该版本，直接从本地导出文件（0秒瞬下）
+                    const cachedBlobUrl = await this.getLocalCachedAudioBlobUrl(cacheKey);
+                    if (cachedBlobUrl) {
+                        const isM4a = playUrl && /\.m4a(\?|$)/i.test(playUrl);
+                        triggerFileDownload(cachedBlobUrl, isM4a ? 'm4a' : 'mp3');
+                        setTimeout(() => URL.revokeObjectURL(cachedBlobUrl), 10000);
+                        this.showToast(`已从本地缓存导出《${track.title}》`);
+                        return;
+                    }
+
+                    this.showToast(`正在准备下载《${track.title}》...`);
+                    let targetUrl = playUrl;
+                    let ext = (targetUrl && /\.m4a(\?|$)/i.test(targetUrl)) ? 'm4a' : 'mp3';
+
+                    // 2. 如果是角色 Suno 歌曲且配置了 API，优先尝试通过 fetch 转成 Blob 触发带文件名的下载
+                    if (targetUrl && targetUrl.startsWith('http') && !this.isAwsUrlExpired(targetUrl)) {
+                        try {
+                            const res = await fetch(targetUrl);
+                            if (res.ok) {
+                                const blob = await res.blob();
+                                if (blob && blob.size > 10000) {
+                                    if (blob.type.includes('mp4') || blob.type.includes('m4a')) ext = 'm4a';
+                                    else if (blob.type.includes('wav')) ext = 'wav';
+                                    const blobUrl = URL.createObjectURL(blob);
+                                    triggerFileDownload(blobUrl, ext);
+                                    setTimeout(() => URL.revokeObjectURL(blobUrl), 15000);
+                                    this.showToast(`《${track.title}》已开始下载`);
+                                    return;
+                                }
+                            }
+                        } catch (e) {}
+                    }
+
+                    // 3. 如果直接 fetch 受跨域限制，且是 Suno 歌曲，调用官方 /api/cqt/v2/suno/download 获取下载直链
+                    if (track.isCharSong || curClipId) {
+                        const musConf = appData.settings.music || {};
+                        const baseUrl = this.getCleanMusicBaseUrl();
+                        const apiKey = (musConf.key || '').trim();
+                        if (apiKey && (curClipId || track.sunoTaskId)) {
+                            this.showToast('正在请求云端生成下载文件直链(约5~15秒)...');
+                            try {
+                                const dlBody = track.sunoTaskId
+                                    ? { taskId: track.sunoTaskId, clipIndex: curVer === 'B' ? 1 : 0 }
+                                    : { clipId: curClipId };
+                                const dlRes = await fetch(`${baseUrl}/api/cqt/v2/suno/download`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                                    body: JSON.stringify(dlBody)
+                                });
+                                const dlJson = await dlRes.json().catch(() => null);
+                                if (dlJson && dlJson.code === 200 && dlJson.data) {
+                                    const dlUrl = typeof dlJson.data === 'string' ? dlJson.data : (dlJson.data.url || '');
+                                    const dlFmt = dlJson.data.format || 'm4a';
+                                    if (dlUrl && dlUrl.startsWith('http')) {
+                                        targetUrl = dlUrl;
+                                        ext = dlFmt;
+                                        try {
+                                            const r2 = await fetch(dlUrl);
+                                            if (r2.ok) {
+                                                const b2 = await r2.blob();
+                                                const bu2 = URL.createObjectURL(b2);
+                                                triggerFileDownload(bu2, ext);
+                                                setTimeout(() => URL.revokeObjectURL(bu2), 15000);
+                                                this.showToast(`《${track.title}》已开始下载`);
+                                                return;
+                                            }
+                                        } catch (e) {}
+                                    }
+                                }
+                            } catch (e) {}
+                        }
+                    }
+
+                    // 4. 兜底：直接触发浏览器原生链接下载
+                    if (targetUrl && targetUrl.startsWith('http')) {
+                        triggerFileDownload(targetUrl, ext);
+                        this.showToast('已拉起浏览器下载');
+                    } else {
+                        this.showToast('该曲目暂无可用下载链接');
+                    }
+                },
+
+                // 检查亚马逊 S3 签名链接是否已经超过 X-Amz-Expires 有效期
+                isAwsUrlExpired: function(url) {
+                    if (!url || !url.includes('X-Amz-Date=') || !url.includes('X-Amz-Expires=')) return false;
+                    try {
+                        const dateMatch = url.match(/X-Amz-Date=(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/i);
+                        const expMatch = url.match(/X-Amz-Expires=(\d+)/i);
+                        if (dateMatch && expMatch) {
+                            const signTime = Date.UTC(
+                                parseInt(dateMatch[1]), parseInt(dateMatch[2]) - 1, parseInt(dateMatch[3]),
+                                parseInt(dateMatch[4]), parseInt(dateMatch[5]), parseInt(dateMatch[6])
+                            );
+                            const expireSec = parseInt(expMatch[1]);
+                            if (Date.now() > signTime + expireSec * 1000 - 30000) {
+                                return true;
+                            }
+                        }
+                    } catch (e) {}
+                    return false;
+                },
+
                 playTrackAtIndex: async function(idx) {
                     const track = this.playlistQueue[idx];
                     if (!track) return;
                     this.curTrackIdx = idx;
+                    this._lastTrackLoadFailed = false;
                     const audio = document.getElementById('cm-global-audio');
                     if (!audio) return;
 
@@ -14202,131 +15216,374 @@ if (badgeEl) {
                         this._audioLoadRetryTimer = null;
                     }
 
-                    // 支持双版本 A/B 切换音源
+                    // 1. 提取当前版本（A 或 B）的音频地址、真实的 UUID (clipId) 与任务号 (sunoTaskId)
                     const activeVer = track.activeVer || 'A';
                     let playUrl = (activeVer === 'B' && track.audioUrlB) ? track.audioUrlB : track.audioUrl;
-                    const curClipId = (activeVer === 'B' && track.clipIdB) ? track.clipIdB : track.clipId;
+                    let rawClipId = (activeVer === 'B' && track.clipIdB) ? track.clipIdB : track.clipId;
+                    let curClipId = rawClipId || '';
+                    let fallbackTaskId = track.sunoTaskId || '';
 
-                    if (!playUrl) {
-                        this.showToast('该曲目暂无有效音频地址');
-                        return;
+                    if (curClipId && curClipId.includes('_')) {
+                        const parts = curClipId.split('_');
+                        if (parts[0] && parts[0] !== 'suno') {
+                            fallbackTaskId = fallbackTaskId || parts[0];
+                        }
+                        curClipId = '';
+                    }
+                    if (!fallbackTaskId && track.id && String(track.id).startsWith('suno_')) {
+                        const rawIdBody = String(track.id).replace(/^suno_/, '');
+                        if (rawIdBody.includes('_')) {
+                            fallbackTaskId = rawIdBody.split('_')[0];
+                        }
+                    }
+
+                    // 尝试从音频 URL、歌曲 ID 或封面图 URL 中提取标准 UUID 格式的 clipId
+                    const extractUuid = (str) => {
+                        const m = String(str || '').match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+                        return m ? m[1] : '';
+                    };
+                    if (!curClipId) curClipId = extractUuid(playUrl) || extractUuid(track.id) || extractUuid(track.cover);
+                    if (curClipId) {
+                        if (activeVer === 'B') track.clipIdB = curClipId;
+                        else track.clipId = curClipId;
                     }
 
                     this.updatePlayerMetaUI(track);
                     this.loadLyricsForTrack(track);
 
-                    // 关键修复1：移除 crossOrigin 并设置 no-referrer，防止 Suno CDN 防盗链与跨域拦截
                     audio.removeAttribute('crossorigin');
                     audio.referrerPolicy = 'no-referrer';
 
-                    let hasTriedDirectApi = false;
+                    const isSunoSong = !!(track.isCharSong || String(track.id || '').startsWith('suno_') || (playUrl && (playUrl.includes('suno') || playUrl.includes('cqtai'))));
+                    const cacheKey = isSunoSong ? (`suno_audio_${curClipId || track.id}_${activeVer}`) : '';
 
-                    const tryFetchDirectAudioUrl = async () => {
-                        if (hasTriedDirectApi || !track.isCharSong || !curClipId || curClipId.includes('_')) return false;
-                        hasTriedDirectApi = true;
-                        this.showToast(`正在为版本 ${activeVer} 获取高速直链...`);
-                        try {
-                            const musConf = appData.settings.music || {};
-                            const baseUrl = this.getCleanMusicBaseUrl();
-                            const apiKey = (musConf.key || '').trim();
-                            if (apiKey) {
-                                const dlRes = await fetch(`${baseUrl}/api/cqt/v2/suno/download`, {
-                                    method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json',
-                                        'Authorization': `Bearer ${apiKey}`
-                                    },
-                                    body: JSON.stringify({ id: curClipId })
-                                });
-                                const dlJson = await dlRes.json().catch(() => null);
-                                const directUrl = typeof dlJson?.data === 'string'
-                                    ? dlJson.data
-                                    : (dlJson?.data?.url || dlJson?.data?.audio_url || dlJson?.url || '');
-                                if (directUrl && directUrl.startsWith('http')) {
-                                    if (activeVer === 'B') track.audioUrlB = directUrl;
-                                    else track.audioUrl = directUrl;
-                                    this.syncSongDataEverywhere(track);
-                                    startPlayUrl(directUrl);
-                                    return true;
-                                }
-                            }
-                        } catch (e) {
-                            console.warn('[Audio] 获取直链失败:', e);
+                    // 2. 优先检查本地 IndexedDB 是否已存有永久音频文件（若有则 0 秒直播，无视云端过期）
+                    if (cacheKey) {
+                        const localBlobUrl = await this.getLocalCachedAudioBlobUrl(cacheKey);
+                        if (localBlobUrl) {
+                            audio.oncanplay = null;
+                            audio.onloadeddata = null;
+                            audio.onerror = null;
+                            audio.src = localBlobUrl;
+                            audio.play().then(() => {
+                                this.isPlaying = true;
+                                this.syncPlayStateUI();
+                            }).catch(() => {
+                                this.isPlaying = false;
+                                this.syncPlayStateUI();
+                            });
+                            return;
                         }
-                        return false;
+                    }
+
+                    // 3. 构建候选播放地址队列（如果是网易云歌曲，自动挂载多条高可用备用音源通道；如果是 Suno 歌曲则检查 S3 有效期）
+                    const candidateUrls = [];
+                    if (playUrl && playUrl.startsWith('http') && !this.isAwsUrlExpired(playUrl)) {
+                        candidateUrls.push(playUrl);
+                    }
+                    const neteaseSid = !isSunoSong ? (track.songId || (playUrl && playUrl.match(/[?&]id=(\d+)/) ? playUrl.match(/[?&]id=(\d+)/)[1] : '')) : '';
+                    if (neteaseSid) {
+                        const backupDirectUrls = [
+                            `https://api.injahow.cn/meting/?type=url&id=${neteaseSid}`,
+                            `https://api.i-meto.com/meting/api?server=netease&type=url&id=${neteaseSid}`,
+                            `https://music.163.com/song/media/outer/url?id=${neteaseSid}.mp3`
+                        ];
+                        backupDirectUrls.forEach(u => {
+                            if (!candidateUrls.includes(u)) candidateUrls.push(u);
+                        });
+                    }
+
+                    if (candidateUrls.length === 0 && !isSunoSong) {
+                        this._lastTrackLoadFailed = true;
+                        this.showToast('该曲目暂无有效音频地址');
+                        return;
+                    }
+
+                    let curUrlIdx = -1;
+                    let hasTriedCqtRescue = false;
+                    let hasTriedNeteaseApiRescue = false;
+
+                    // 网易云歌曲专属 API 动态解析救援（当直链重定向被拒时，调用 /song/url 接口获取带真实 Token 的音频流）
+                    const rescueNeteaseAudioUrl = async (sid) => {
+                        if (!sid) return '';
+                        const apiEndpoints = [
+                            `https://zm.armoe.cn/song/url/v1?id=${sid}&level=exhigh`,
+                            `https://ncm.zhenxin.me/song/url/v1?id=${sid}&level=exhigh`,
+                            `https://music-api.heheda.top/song/url?id=${sid}&br=320000`,
+                            `https://zm.armoe.cn/song/url?id=${sid}`
+                        ];
+                        for (let ep of apiEndpoints) {
+                            if (this.curTrackIdx !== idx) return '';
+                            try {
+                                const ctrl = new AbortController();
+                                const t = setTimeout(() => ctrl.abort(), 4500);
+                                const res = await fetch(ep, { signal: ctrl.signal });
+                                clearTimeout(t);
+                                if (!res.ok) continue;
+                                const data = await res.json();
+                                const item = Array.isArray(data?.data) ? data.data[0] : data?.data;
+                                if (item && item.url && typeof item.url === 'string' && item.url.startsWith('http')) {
+                                    return item.url.replace(/^http:\/\//i, 'https://');
+                                }
+                            } catch (e) {}
+                        }
+                        return '';
                     };
 
-                    const startPlayUrl = (urlToPlay) => {
+                    // 云端三级救援函数：1. 优先用 taskId/clipId 调 download -> 2. 调内部 task:"wav" 重新导出 -> 3. 允许手动输入 taskId 找回
+                    const rescueExpiredSunoAudio = async () => {
+                        const musConf = appData.settings.music || {};
+                        const baseUrl = this.getCleanMusicBaseUrl();
+                        const apiKey = (musConf.key || '').trim();
+                        if (!apiKey) return '';
+
+                        const miniLyric = document.getElementById('cm-mini-lyric');
+                        const inlineLyric = document.getElementById('cm-fp-inline-lyric');
+                        const setStatusText = (txt) => {
+                            if (miniLyric) miniLyric.innerText = txt;
+                            if (inlineLyric) inlineLyric.innerText = txt;
+                        };
+
+                        // 救援通道 A：严格按照 CQTAI 官方文档调用 POST /api/cqt/v2/suno/download
+                        // 支持自动重试（应对 500 archive failed 偶发失败），并支持 clipId / url / taskId(含时间轴任务ID) 三种方式
+                        const tryDownloadApi = async (bodyPayload, retryCount = 2) => {
+                            for (let r = 0; r <= retryCount; r++) {
+                                if (this.curTrackIdx !== idx) return '';
+                                if (r > 0) {
+                                    setStatusText(`云端归档繁忙，正在第 ${r + 1} 次重试转存直链...`);
+                                    await new Promise(res => setTimeout(res, 2500));
+                                }
+                                try {
+                                    const ctrl = new AbortController();
+                                    const t = setTimeout(() => ctrl.abort(), 65000);
+                                    const dlRes = await fetch(`${baseUrl}/api/cqt/v2/suno/download`, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                                        body: JSON.stringify(bodyPayload),
+                                        signal: ctrl.signal
+                                    });
+                                    clearTimeout(t);
+                                    const dlJson = await dlRes.json().catch(() => null);
+                                    if (dlJson && dlJson.code === 200 && dlJson.data) {
+                                        const u = typeof dlJson.data === 'string' ? dlJson.data : (dlJson.data.url || dlJson.data.audio_url || '');
+                                        const retClipId = dlJson.data.clipId || '';
+                                        if (retClipId && !retClipId.includes('_')) {
+                                            curClipId = retClipId;
+                                            if (activeVer === 'B') track.clipIdB = retClipId;
+                                            else track.clipId = retClipId;
+                                        }
+                                        if (u && u.startsWith('http')) return u;
+                                    }
+                                    // 如果是参数无效或明确找不到歌曲，不再重复重试同一参数
+                                    const errMsg = String(dlJson?.msg || '');
+                                    if (errMsg.includes('param_invalid') || errMsg.includes('clip not found') || errMsg.includes('Points insufficient')) {
+                                        break;
+                                    }
+                                } catch (e) {}
+                            }
+                            return '';
+                        };
+
+                        this.showToast('24小时临时链接已过期，正在通过单曲下载接口转存30天直链...');
+                        setStatusText('正在通过 CQTAI 单曲下载接口转存直链(约5~20秒)...');
+
+                        // 1. 优先尝试生歌时的平台任务 ID (sunoTaskId + clipIndex)
+                        if (fallbackTaskId) {
+                            const urlByTask = await tryDownloadApi({ taskId: fallbackTaskId, clipIndex: activeVer === 'B' ? 1 : 0 }, 1);
+                            if (urlByTask) return urlByTask;
+                        }
+
+                        // 2. 利用官方文档特性：“导出类任务（mp4 / wav / 时间轴 / 节拍）没有歌曲列表时，自动取该任务提交时用的歌曲 ID”
+                        // 如果旧歌以前生成过歌词时间轴或声音角色，直接拿它存下的 timelineTaskId / personaTaskId 去反查下载！
+                        const exportTaskId = (activeVer === 'B')
+                            ? (track.timelineTaskIdB || track.personaTaskIdB || '')
+                            : (track.timelineTaskIdA || track.personaTaskIdA || '');
+                        if (exportTaskId && exportTaskId !== fallbackTaskId) {
+                            const urlByExportTask = await tryDownloadApi({ taskId: exportTaskId }, 1);
+                            if (urlByExportTask) return urlByExportTask;
+                        }
+
+                        // 3. 标准方式：传歌曲片段 ID { clipId }（遇到 500 archive failed 自动重试 2 次）
+                        if (curClipId) {
+                            const urlByClip = await tryDownloadApi({ clipId: curClipId }, 2);
+                            if (urlByClip) return urlByClip;
+
+                            // 4. 官方文档第 2 种给歌方式：传 Suno 歌曲页地址 { url: "https://suno.com/song/<clipId>" }
+                            const urlByPage = await tryDownloadApi({ url: `https://suno.com/song/${curClipId}` }, 1);
+                            if (urlByPage) return urlByPage;
+                        }
+
+                        // 救援通道 B：当 /suno/download 因非公开歌曲报 500 archive failed 时，调用内部任务接口 task: "wav" 重新签发 S3 音频链接
+                        if (curClipId) {
+                            setStatusText('常规归档受限，正在通过上游内部通道提取 WAV 音源...');
+                            try {
+                                const subRes = await fetch(`${baseUrl}/api/cqt/generator/suno`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                                    body: JSON.stringify({ task: 'wav', clipId: curClipId })
+                                });
+                                const subJson = await subRes.json().catch(() => null);
+                                const wavTaskId = typeof subJson?.data === 'string'
+                                    ? subJson.data.trim()
+                                    : String(subJson?.data?.id || subJson?.data?.task_id || subJson?.id || '').trim();
+
+                                if (wavTaskId && !wavTaskId.startsWith('{')) {
+                                    for (let p = 0; p < 20; p++) {
+                                        if (this.curTrackIdx !== idx) return '';
+                                        await new Promise(r => setTimeout(r, 2500));
+                                        setStatusText(`正在等待上游导出新音源 (${p + 1}/20)...`);
+                                        const infoRes = await fetch(`${baseUrl}/api/cqt/info/suno?id=${encodeURIComponent(wavTaskId)}&_t=${Date.now()}`, {
+                                            headers: { 'Authorization': `Bearer ${apiKey}` }
+                                        });
+                                        if (!infoRes.ok) continue;
+                                        const rawTxt = await infoRes.text().catch(() => '');
+                                        if (!rawTxt) continue;
+                                        // 从返回结果中提取最新签发的 .wav / .mp3 / .m4a 链接
+                                        const cleanTxt = rawTxt.replace(/\\+/g, '');
+                                        const matchedUrls = cleanTxt.match(/https?:\/\/[^"'\s<>]+\.(?:wav|mp3|m4a)(?:\?[^"'\s<>]*)?/gi);
+                                        if (matchedUrls && matchedUrls[0]) {
+                                            return matchedUrls[0];
+                                        }
+                                        let infoObj = null;
+                                        try { infoObj = JSON.parse(rawTxt); } catch (e) {}
+                                        const st = String(infoObj?.data?.status || infoObj?.status || '').toLowerCase();
+                                        if (st === 'failed' || st === 'error') break;
+                                    }
+                                }
+                            } catch (e) {
+                                console.warn('[Audio] WAV 内部通道提取失败:', e);
+                            }
+                        }
+                        return '';
+                    };
+
+                    const tryNextSource = async () => {
+                        if (this.curTrackIdx !== idx) return;
+                        curUrlIdx++;
+                        if (curUrlIdx < candidateUrls.length) {
+                            startPlayUrl(candidateUrls[curUrlIdx], 5000);
+                            return;
+                        }
+
+                        if (!hasTriedNeteaseApiRescue && !isSunoSong && neteaseSid) {
+                            hasTriedNeteaseApiRescue = true;
+                            const apiSongUrl = await rescueNeteaseAudioUrl(neteaseSid);
+                            if (this.curTrackIdx !== idx) return;
+                            if (apiSongUrl && !candidateUrls.includes(apiSongUrl)) {
+                                candidateUrls.push(apiSongUrl);
+                                startPlayUrl(apiSongUrl, 8000);
+                                return;
+                            }
+                        }
+
+                        if (!hasTriedCqtRescue && isSunoSong) {
+                            hasTriedCqtRescue = true;
+                            const rescuedUrl = await rescueExpiredSunoAudio();
+                            if (this.curTrackIdx !== idx) return;
+                            if (rescuedUrl) {
+                                if (activeVer === 'B') track.audioUrlB = rescuedUrl;
+                                else track.audioUrl = rescuedUrl;
+                                this.syncSongDataEverywhere(track);
+                                this.showToast('音源恢复成功，正在播放并永久缓存至本地！');
+                                candidateUrls.push(rescuedUrl);
+                                startPlayUrl(rescuedUrl, 15000);
+                                return;
+                            }
+                        }
+
+                        this._lastTrackLoadFailed = true;
+                        this.isPlaying = false;
+                        this.syncPlayStateUI();
+
+                        const miniLyric = document.getElementById('cm-mini-lyric');
+                        const inlineLyric = document.getElementById('cm-fp-inline-lyric');
+                        if (isSunoSong) {
+                            if (miniLyric) miniLyric.innerText = '该歌曲24小时云端链接已过期（可点左下角⋯复制歌词）';
+                            if (inlineLyric) inlineLyric.innerText = '该歌曲24小时云端链接已过期（可点左下角⋯复制歌词）';
+                            this.showToast('该歌曲的24小时云端临时链接已过期，可点击左下角「⋯」复制歌词');
+                        } else {
+                            if (miniLyric) miniLyric.innerText = '该曲目受版权限制暂无法播放，请换一首试试';
+                            if (inlineLyric) inlineLyric.innerText = '该曲目受版权限制暂无法播放，请换一首试试';
+                            this.showToast('该曲目受版权限制暂无法播放，请换一首试试');
+                        }
+                    };
+
+                    const startPlayUrl = (urlToPlay, timeoutMs = 5000) => {
+                        if (!urlToPlay) {
+                            tryNextSource();
+                            return;
+                        }
                         if (this._audioLoadRetryTimer) {
                             clearTimeout(this._audioLoadRetryTimer);
                             this._audioLoadRetryTimer = null;
                         }
                         audio.oncanplay = null;
+                        audio.onloadeddata = null;
                         audio.onerror = null;
 
                         audio.src = urlToPlay;
 
-                        // 如果超过 6 秒音频流依然卡在缓冲中未就绪，自动调用单曲下载接口换取 CDN 直链
-                        if (!hasTriedDirectApi && track.isCharSong && curClipId) {
-                            this._audioLoadRetryTimer = setTimeout(() => {
-                                if (this.curTrackIdx === idx && audio.readyState < 2) {
-                                    tryFetchDirectAudioUrl();
-                                }
-                            }, 6000);
-                        }
-
-                        // 当音频缓冲足够可以播放时自动触发播放
-                        audio.oncanplay = () => {
+                        const onReadyToPlay = () => {
                             if (this._audioLoadRetryTimer) {
                                 clearTimeout(this._audioLoadRetryTimer);
                                 this._audioLoadRetryTimer = null;
                             }
                             audio.oncanplay = null;
+                            audio.onloadeddata = null;
                             if (this.curTrackIdx !== idx) return;
+
+                            this._lastTrackLoadFailed = false;
+
+                            if (isSunoSong) {
+                                if (activeVer === 'B') track.audioUrlB = urlToPlay;
+                                else track.audioUrl = urlToPlay;
+                                this.syncSongDataEverywhere(track);
+                            }
+
                             audio.play().then(() => {
                                 this.isPlaying = true;
                                 this.syncPlayStateUI();
-                            }).catch(err => {
-                                console.warn('[Audio] 自动播放需用户手势确认:', err);
+                            }).catch(() => {
+                                this.isPlaying = false;
+                                this.syncPlayStateUI();
+                                this.showToast('音频已就绪，请点击播放键开始播放');
                             });
                         };
 
-                        // 如果原 CDN 链接报错，自动调用单曲下载接口换取直链播放
-                        audio.onerror = async () => {
+                        audio.oncanplay = onReadyToPlay;
+                        audio.onloadeddata = onReadyToPlay;
+
+                        audio.onerror = () => {
                             if (this._audioLoadRetryTimer) {
                                 clearTimeout(this._audioLoadRetryTimer);
                                 this._audioLoadRetryTimer = null;
                             }
                             audio.onerror = null;
-                            if (this.curTrackIdx !== idx) return;
-
-                            const switched = await tryFetchDirectAudioUrl();
-                            if (switched) return;
-
-                            this.isPlaying = false;
-                            this.syncPlayStateUI();
-                            this.showToast('音频缓冲中，请稍候数秒再点击播放');
+                            tryNextSource();
                         };
+
+                        this._audioLoadRetryTimer = setTimeout(() => {
+                            if (this.curTrackIdx === idx && audio.readyState < 2) {
+                                tryNextSource();
+                            }
+                        }, timeoutMs);
 
                         audio.load();
                         const playPromise = audio.play();
                         if (playPromise !== undefined) {
                             playPromise.then(() => {
+                                if (this._audioLoadRetryTimer) {
+                                    clearTimeout(this._audioLoadRetryTimer);
+                                    this._audioLoadRetryTimer = null;
+                                }
+                                this._lastTrackLoadFailed = false;
                                 this.isPlaying = true;
                                 this.syncPlayStateUI();
-                            }).catch(err => {
-                                if (err.name === 'NotAllowedError') {
-                                    this.isPlaying = false;
-                                    this.syncPlayStateUI();
-                                    this.showToast('音频已就绪，请再次点击播放');
-                                } else {
-                                    this.showToast('正在缓冲音频流，就绪后将自动播放...');
-                                }
-                            });
+                            }).catch(() => {});
                         }
                     };
 
-                    startPlayUrl(playUrl);
+                    tryNextSource();
                 },
 
                 switchSongABVersion: function() {
@@ -14452,25 +15709,32 @@ if (badgeEl) {
                     }
 
                     const abBtn = document.getElementById('cm-fp-ab-switch');
+                    const abTxt = document.getElementById('cm-fp-ab-switch-txt');
                     if (abBtn) {
                         if (track.audioUrlB) {
-                            abBtn.style.display = 'inline-block';
-                            abBtn.innerText = `当前版本 ${track.activeVer || 'A'} · 点击切换 A/B`;
+                            abBtn.style.display = 'flex';
+                            if (abTxt) abTxt.innerText = `当前版本 ${track.activeVer || 'A'} · 切换 A/B`;
                         } else {
                             abBtn.style.display = 'none';
                         }
                     }
                     const personaBtn = document.getElementById('cm-fp-persona-btn');
+                    const personaTxt = document.getElementById('cm-fp-persona-btn-txt');
+                    const curVer = track.activeVer || 'A';
                     if (personaBtn) {
                         if (track.isCharSong) {
-                            personaBtn.style.display = 'inline-block';
-                            const curVer = track.activeVer || 'A';
+                            personaBtn.style.display = 'flex';
                             const savedPid = (curVer === 'B') ? track.personaIdB : track.personaIdA;
-                            personaBtn.innerText = savedPid ? `已获声音ID (${curVer}) · 点击复制` : `获取声音 ID (版本${curVer})`;
+                            if (personaTxt) personaTxt.innerText = savedPid ? `复制声音 ID (版本${curVer})` : `获取声音 ID (版本${curVer})`;
                         } else {
                             personaBtn.style.display = 'none';
                         }
                     }
+                    const cacheBtnTxt = document.getElementById('cm-fp-cache-btn-txt');
+                    const dlBtnTxt = document.getElementById('cm-fp-download-btn-txt');
+                    const verSuffix = (track.isCharSong || track.audioUrlB) ? ` (版本${curVer})` : '';
+                    if (cacheBtnTxt) cacheBtnTxt.innerText = `缓存歌曲到本地${verSuffix}`;
+                    if (dlBtnTxt) dlBtnTxt.innerText = `下载到本地${verSuffix}`;
                     this.updateLikeBtnUI(track);
                     const likeBadge = document.getElementById('cm-fp-like-count-badge');
                     if (likeBadge) {
@@ -14516,15 +15780,28 @@ if (badgeEl) {
                         this.playTrackAtIndex(0);
                         return;
                     }
-                    if (!audio.src) return this.showToast('请先选择一首歌曲');
+                    if (!audio.src && this.curTrackIdx < 0) return this.showToast('请先选择一首歌曲');
                     if (this.isPlaying) {
                         audio.pause();
                         this.isPlaying = false;
+                        this.syncPlayStateUI();
                     } else {
-                        audio.play().catch(() => {});
-                        this.isPlaying = true;
+                        // 如果上次音源加载失败、或者当前 audio 处于报错/未就绪状态，点击播放键时重新触发完整寻址与云端转存
+                        if (this._lastTrackLoadFailed || audio.error || audio.readyState === 0 || !audio.src) {
+                            if (this.curTrackIdx >= 0 && this.playlistQueue[this.curTrackIdx]) {
+                                this.playTrackAtIndex(this.curTrackIdx);
+                                return;
+                            }
+                        }
+                        audio.play().then(() => {
+                            this.isPlaying = true;
+                            this.syncPlayStateUI();
+                        }).catch(() => {
+                            if (this.curTrackIdx >= 0 && this.playlistQueue[this.curTrackIdx]) {
+                                this.playTrackAtIndex(this.curTrackIdx);
+                            }
+                        });
                     }
-                    this.syncPlayStateUI();
                 },
 
                 playNext: function() {
@@ -14559,11 +15836,28 @@ if (badgeEl) {
                     this.showToast(`已切换为${names[this.playMode]}播放`);
                 },
 
-                openCopyLyricsModal: function() {
+                toggleMoreActionsMenu: function(e) {
+                    if (e) e.stopPropagation();
                     const track = this.playlistQueue[this.curTrackIdx];
                     if (!track) return this.showToast('当前没有正在播放的歌曲');
-                    const modal = document.getElementById('modal-cm-copy-lyrics');
-                    if (modal) modal.style.display = 'flex';
+                    const menu = document.getElementById('cm-fp-more-menu');
+                    if (!menu) return;
+                    const isShow = menu.classList.contains('show');
+                    if (isShow) {
+                        menu.classList.remove('show');
+                    } else {
+                        this.updatePlayerMetaUI(track);
+                        menu.classList.add('show');
+                    }
+                },
+
+                closeMoreActionsMenu: function() {
+                    const menu = document.getElementById('cm-fp-more-menu');
+                    if (menu) menu.classList.remove('show');
+                },
+
+                openCopyLyricsModal: function() {
+                    this.toggleMoreActionsMenu();
                 },
 
                 confirmCopyCurrentLyrics: function() {
@@ -14588,6 +15882,7 @@ if (badgeEl) {
                 },
 
                 openCurrentQueueModal: function() {
+                    this.closeMoreActionsMenu();
                     this.renderCurrentQueueList();
                     const modal = document.getElementById('modal-cm-queue-drawer');
                     if (modal) modal.style.display = 'flex';
@@ -14609,7 +15904,6 @@ if (badgeEl) {
                         const isCur = (idx === this.curTrackIdx);
                         const activeColor = isCur ? '#ff4d5a' : '#ffffff';
                         const subColor = isCur ? 'rgba(255,77,90,0.8)' : 'rgba(255,255,255,0.45)';
-                        const badge = s.isCharSong ? `<span style="font-size:9.5px; background:rgba(230,57,70,0.22); color:#ff758f; padding:1px 5px; border-radius:4px; font-weight:700; margin-right:5px; flex-shrink:0;">${s.charName || 'TA'}演唱</span>` : '';
                         const playingIcon = isCur
                             ? `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#ff4d5a" stroke-width="2.4" stroke-linecap="round" style="flex-shrink:0; margin-right:8px;"><line x1="4" y1="20" x2="4" y2="10"></line><line x1="10" y1="20" x2="10" y2="4"></line><line x1="16" y1="20" x2="16" y2="14"></line><line x1="22" y1="20" x2="22" y2="8"></line></svg>`
                             : `<span style="width:22px; font-size:11.5px; color:rgba(255,255,255,0.35); font-family:monospace; flex-shrink:0;">${String(idx + 1).padStart(2, '0')}</span>`;
@@ -14619,7 +15913,6 @@ if (badgeEl) {
                             <div style="display:flex; align-items:center; flex:1; min-width:0; padding-right:10px;">
                                 ${playingIcon}
                                 <div style="display:flex; align-items:center; flex:1; min-width:0;">
-                                    ${badge}
                                     <span style="font-size:13.5px; font-weight:${isCur ? '700' : '500'}; color:${activeColor}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${s.title}</span>
                                     <span style="font-size:11.5px; color:${subColor}; margin-left:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex-shrink:0;">· ${s.artist || '未知歌手'}</span>
                                 </div>
@@ -15267,7 +16560,9 @@ if (badgeEl) {
                 isSongLiked: function(track) {
                     if (!track) return false;
                     const prof = this.getActiveProfile();
-                    return prof.likedSongs.some(s => s.id === track.id);
+                    const inLiked = (prof.likedSongs || []).some(s => s.id === track.id);
+                    const inCustom = (prof.customPlaylists || []).some(pl => (pl.songs || []).some(s => s.id === track.id));
+                    return inLiked || inCustom;
                 },
 
                 updateLikeBtnUI: function(track) {
@@ -15277,6 +16572,90 @@ if (badgeEl) {
                     btn.innerHTML = liked
                         ? `<svg viewBox="0 0 24 24" width="22" height="22" fill="#e63946" stroke="#e63946" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>`
                         : `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>`;
+                },
+
+                showTempLinkPermanentNotice: function(songTitle) {
+                    const modal = document.getElementById('modal-suno-temp-link-notice');
+                    const titleEl = document.getElementById('suno-temp-notice-title');
+                    if (titleEl) {
+                        titleEl.innerText = songTitle ? `《${songTitle}》录制完成` : '歌曲录制完成 · 临时链接提醒';
+                    }
+                    if (modal) modal.style.display = 'flex';
+                },
+
+                openShareSongToChatModal: async function() {
+                    const track = this.playlistQueue[this.curTrackIdx];
+                    if (!track) return this.showToast('当前没有正在播放的歌曲');
+                    if (window.ensurePartitionLoaded) {
+                        await window.ensurePartitionLoaded('chats');
+                    }
+                    const listCtn = document.getElementById('cm-share-chat-list');
+                    const subEl = document.getElementById('cm-share-song-sub');
+                    if (subEl) subEl.innerText = `分享《${track.title}》- ${track.artist || '未知歌手'}`;
+
+                    const chats = appData.chats || [];
+                    if (chats.length === 0) {
+                        listCtn.innerHTML = `<div style="text-align:center; padding:30px 10px; color:#8e8e93; font-size:12.5px;">暂无聊天会话，请先在聊天中发起对话</div>`;
+                    } else {
+                        let html = '';
+                        for (let ch of chats) {
+                            const dispName = ch.nickname || ch.name || '未命名聊天';
+                            const typeLabel = ch.type === 'group' ? '群聊' : '好友';
+                            let thumbUrl = '';
+                            if (ch.type === 'group') {
+                                if (ch.avatar) {
+                                    thumbUrl = await generateThumbnail(ch.avatar, 96);
+                                } else if (ch.targetIds && ch.targetIds[0]) {
+                                    const firstC = (appData.charCards || []).find(x => x.id === ch.targetIds[0]);
+                                    if (firstC) thumbUrl = firstC.avatarThumb || (firstC.avatar ? await generateThumbnail(firstC.avatar, 96) : '');
+                                }
+                            } else if (ch.targetIds && ch.targetIds[0]) {
+                                const cObj = (appData.charCards || []).find(x => x.id === ch.targetIds[0]);
+                                if (cObj) {
+                                    if (!cObj.avatarThumb && cObj.avatar) cObj.avatarThumb = await generateThumbnail(cObj.avatar, 96);
+                                    thumbUrl = cObj.avatarThumb || cObj.avatar || '';
+                                }
+                            }
+                            html += `
+                            <div onclick="window.MusicAppSys.confirmShareSongToChat('${ch.id}')" style="display:flex; align-items:center; gap:10px; padding:9px 4px; border-bottom:0.5px dashed #f0f0f2; cursor:pointer;">
+                                <div data-lazy-avatar="${thumbUrl}" style="width:36px; height:36px; border-radius:50%; background-color:#eee; background-size:cover; background-position:center; flex-shrink:0; border:0.5px solid rgba(0,0,0,0.06);"></div>
+                                <div style="flex:1; min-width:0;">
+                                    <div style="font-size:13.5px; font-weight:600; color:#1c1c1e; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${dispName}</div>
+                                    <div style="font-size:10.5px; color:#8e8e93; margin-top:1px;">${typeLabel}</div>
+                                </div>
+                                <span style="padding:5px 12px; border-radius:12px; background:rgba(230,57,70,0.1); color:#e63946; font-size:12px; font-weight:700; flex-shrink:0;">发送</span>
+                            </div>`;
+                        }
+                        listCtn.innerHTML = html;
+                        window.renderLazyAvatarBatch('#cm-share-chat-list', 'data-lazy-avatar', 8, 16);
+                    }
+                    document.getElementById('modal-cm-share-to-chat').style.display = 'flex';
+                },
+
+                confirmShareSongToChat: function(chatId) {
+                    const track = this.playlistQueue[this.curTrackIdx];
+                    if (!track) return;
+                    const chat = (appData.chats || []).find(c => c.id === chatId);
+                    if (!chat) return;
+
+                    let fullLyrics = track.rawLyrics || '';
+                    if (!fullLyrics && Array.isArray(this.currentLyrics) && this.currentLyrics.length > 0) {
+                        fullLyrics = this.currentLyrics.map(l => l.text).filter(Boolean).join('\n');
+                    }
+
+                    const songCopy = JSON.parse(JSON.stringify(track));
+                    if (fullLyrics) songCopy.rawLyrics = fullLyrics;
+
+                    chat.messages.push({
+                        id: 'mus_share_' + Date.now(),
+                        isUser: true,
+                        type: 'music_share',
+                        songData: songCopy,
+                        ts: Date.now()
+                    });
+                    saveChatData();
+                    document.getElementById('modal-cm-share-to-chat').style.display = 'none';
+                    this.showToast(`已分享《${track.title}》到「${chat.nickname || chat.name}」`);
                 },
 
                 toggleLikeCurrentSong: function() {
@@ -15302,17 +16681,23 @@ if (badgeEl) {
 
                     const bannerEl = document.getElementById('cm-me-banner');
                     if (bannerEl) {
-                        bannerEl.style.backgroundImage = prof.coverBg ? `url('${prof.coverBg}')` : '';
+                        if (prof.coverBg) {
+                            bannerEl.style.backgroundImage = `url('${prof.coverBg}')`;
+                            bannerEl.classList.add('has-custom-bg');
+                        } else {
+                            bannerEl.style.backgroundImage = '';
+                            bannerEl.classList.remove('has-custom-bg');
+                        }
                     }
                     const nameEl = document.getElementById('cm-me-user-name');
                     if (nameEl) nameEl.innerText = uObj.name || 'User';
 
-                    // 用户头像采用小缩略图异步渲染
+                    // 用户大头像采用 256px 高清视网膜分辨率渲染，彻底解决模糊问题
                     const avatarEl = document.getElementById('cm-me-user-avatar');
                     if (avatarEl) {
                         if (uObj.avatar) {
-                            generateThumbnail(uObj.avatar, 96).then(thumb => {
-                                avatarEl.style.backgroundImage = `url('${thumb}')`;
+                            generateThumbnail(uObj.avatar, 256).then(thumb => {
+                                avatarEl.style.backgroundImage = `url('${thumb || uObj.avatar}')`;
                             });
                         } else {
                             avatarEl.style.backgroundImage = 'none';
@@ -15376,6 +16761,7 @@ if (badgeEl) {
                 },
 
                 openPlaylistDetail: function(plId) {
+                    this.activePlaylistId = plId;
                     const prof = this.getActiveProfile();
                     let title = '歌单详情';
                     let songs = [];
@@ -15791,30 +17177,136 @@ ${creatorInstruction}
                     this.renderCommentsList(track);
                 },
 
-                // ==================== Suno 创作工坊 & CQTAI 异步轮询与声线克隆 ====================
+                // ==================== Suno 创作工坊自定义下拉框 & CQTAI 异步轮询与声线克隆 ====================
+                closeAllCreateDropdowns: function() {
+                    ['char', 'gender', 'lang'].forEach(k => {
+                        const menu = document.getElementById(`cm-dd-menu-${k}`);
+                        if (menu) menu.classList.remove('show');
+                    });
+                },
+
+                toggleCreateDropdown: async function(type, e) {
+                    if (e) e.stopPropagation();
+                    const targetMenu = document.getElementById(`cm-dd-menu-${type}`);
+                    if (!targetMenu) return;
+                    const isAlreadyOpen = targetMenu.classList.contains('show');
+                    this.closeAllCreateDropdowns();
+                    if (isAlreadyOpen) return;
+
+                    if (type === 'char') {
+                        await this.renderCreateCharDropdownItems();
+                    }
+                    targetMenu.classList.add('show');
+                },
+
+                renderCreateCharDropdownItems: async function() {
+                    const menu = document.getElementById('cm-dd-menu-char');
+                    const selInp = document.getElementById('cm-create-char-sel');
+                    if (!menu || !selInp) return;
+                    const chars = (appData.charCards || []).filter(c => !c.isNPC);
+                    if (chars.length === 0) {
+                        menu.innerHTML = `<div style="padding:12px; text-align:center; color:#8e8e93; font-size:12px;">暂无角色，请先创建角色卡</div>`;
+                        return;
+                    }
+                    const curId = selInp.value;
+                    let html = '';
+                    for (let c of chars) {
+                        if (!c.avatarThumb && c.avatar) {
+                            c.avatarThumb = await generateThumbnail(c.avatar, 96);
+                        }
+                        const thumb = c.avatarThumb || c.avatar || '';
+                        const isSel = (c.id === curId);
+                        html += `
+                        <div class="cm-custom-dropdown-item ${isSel ? 'selected' : ''}" onclick="window.MusicAppSys.selectCreateChar('${c.id}')">
+                            <div data-lazy-avatar="${thumb}" style="width:28px; height:28px; border-radius:50%; background-color:#e5e5ea; background-size:cover; background-position:center; flex-shrink:0; border:0.5px solid rgba(0,0,0,0.06);"></div>
+                            <span style="flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${c.name}</span>
+                            ${isSel ? '<span style="color:#e63946; font-weight:700;">✓</span>' : ''}
+                        </div>`;
+                    }
+                    menu.innerHTML = html;
+                    window.renderLazyAvatarBatch('#cm-dd-menu-char', 'data-lazy-avatar', 8, 16);
+                },
+
+                selectCreateChar: function(charId) {
+                    const selInp = document.getElementById('cm-create-char-sel');
+                    if (selInp) selInp.value = charId;
+                    this.closeAllCreateDropdowns();
+                    this.onCreateCharChange(charId);
+                },
+
+                selectCreateGender: function(val, label) {
+                    const inp = document.getElementById('cm-create-gender');
+                    const txt = document.getElementById('cm-create-gender-trigger-txt');
+                    if (inp) inp.value = val;
+                    if (txt) txt.innerText = label;
+                    document.querySelectorAll('#cm-dd-menu-gender .cm-custom-dropdown-item').forEach(el => {
+                        if (el.getAttribute('data-val') === val) el.classList.add('selected');
+                        else el.classList.remove('selected');
+                    });
+                    this.closeAllCreateDropdowns();
+                },
+
+                selectCreateLang: function(val, label) {
+                    const inp = document.getElementById('cm-create-lang');
+                    const txt = document.getElementById('cm-create-lang-trigger-txt');
+                    if (inp) inp.value = val;
+                    if (txt) txt.innerText = label;
+                    document.querySelectorAll('#cm-dd-menu-lang .cm-custom-dropdown-item').forEach(el => {
+                        if (el.getAttribute('data-val') === val) el.classList.add('selected');
+                        else el.classList.remove('selected');
+                    });
+                    this.closeAllCreateDropdowns();
+                },
+
                 populateCreateCharSelect: function() {
+                    if (!this._globalDocClickBound) {
+                        this._globalDocClickBound = true;
+                        document.addEventListener('click', (e) => {
+                            if (!e.target.closest('.cm-custom-select-wrap')) {
+                                this.closeAllCreateDropdowns();
+                            }
+                            if (!e.target.closest('#cm-fp-more-menu')) {
+                                this.closeMoreActionsMenu();
+                            }
+                            if (!e.target.closest('.cm-song-swipe-wrap') && Date.now() > (this._justSongSwipedUntil || 0)) {
+                                this.resetRevealedSongRows();
+                            }
+                        });
+                    }
                     const sel = document.getElementById('cm-create-char-sel');
                     if (!sel) return;
                     const chars = (appData.charCards || []).filter(c => !c.isNPC);
                     if (chars.length === 0) {
-                        sel.innerHTML = `<option value="">未创建角色</option>`;
+                        sel.value = '';
+                        const nameEl = document.getElementById('cm-create-char-trigger-name');
+                        if (nameEl) nameEl.innerText = '未创建角色';
                         return;
                     }
-                    const curVal = sel.value;
-                    sel.innerHTML = chars.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-                    if (curVal && chars.some(c => c.id === curVal)) sel.value = curVal;
+                    if (!sel.value || !chars.some(c => c.id === sel.value)) {
+                        sel.value = chars[0].id;
+                    }
                     this.onCreateCharChange(sel.value);
                 },
 
-                onCreateCharChange: function(charId) {
+                onCreateCharChange: async function(charId) {
                     const c = (appData.charCards || []).find(x => x.id === charId);
                     if (!c) return;
-                    const genderSel = document.getElementById('cm-create-gender');
-                    const personaInp = document.getElementById('cm-create-persona-id');
-                    if (genderSel) {
-                        const isFemale = /女|girl|female|姐|妹/i.test((c.desc || '') + (c.subtitle || ''));
-                        genderSel.value = c.singingGender || (isFemale ? 'f' : 'm');
+                    const nameEl = document.getElementById('cm-create-char-trigger-name');
+                    const avatarEl = document.getElementById('cm-create-char-trigger-avatar');
+                    if (nameEl) nameEl.innerText = c.name || '选择角色';
+                    if (avatarEl) {
+                        if (!c.avatarThumb && c.avatar) {
+                            c.avatarThumb = await generateThumbnail(c.avatar, 96);
+                        }
+                        const thumb = c.avatarThumb || c.avatar || '';
+                        avatarEl.style.backgroundImage = thumb ? `url('${thumb}')` : 'none';
                     }
+
+                    // 创作页面人声性别默认选择男声 (m)，如角色单独保存过 singingGender 则读取保存值
+                    const targetGender = c.singingGender || 'm';
+                    this.selectCreateGender(targetGender, targetGender === 'f' ? '女声 (f)' : '男声 (m)');
+
+                    const personaInp = document.getElementById('cm-create-persona-id');
                     if (personaInp) {
                         personaInp.value = c.singingPersonaId || '';
                     }
@@ -16185,6 +17677,7 @@ ${titleHint ? `【指定歌名方向】：《${titleHint}》\n` : ''}${userPromp
                                             seenClipKeys.add(uniqueKey);
                                             validClips.push(Object.assign({}, obj, {
                                                 id: realClipId || `${taskId}_${validClips.length}`,
+                                                sunoTaskId: taskId,
                                                 title: obj.title || payload.title,
                                                 audio_url: audioCandidate,
                                                 image_url: obj.image_url || obj.image_large_url || obj.imageUrl || ''
@@ -16220,6 +17713,7 @@ ${titleHint ? `【指定歌名方向】：《${titleHint}》\n` : ''}${userPromp
                                     const m = u.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
                                     return {
                                         id: m ? m[1] : `${taskId}_${idx}`,
+                                        sunoTaskId: taskId,
                                         title: payload.title,
                                         audio_url: u,
                                         image_url: imgUrls[idx] || imgUrls[0] || '',
@@ -16280,6 +17774,7 @@ ${titleHint ? `【指定歌名方向】：《${titleHint}》\n` : ''}${userPromp
                         const clipB = clips[1] || null;
                         const newSong = {
                             id: 'suno_' + (clipA.id || Date.now()),
+                            sunoTaskId: clipA.sunoTaskId || '',
                             clipId: clipA.id || '',
                             clipIdB: clipB ? clipB.id : '',
                             title: clipA.title || title,
@@ -16301,8 +17796,8 @@ ${titleHint ? `【指定歌名方向】：《${titleHint}》\n` : ''}${userPromp
                         saveMusicData();
 
                         this.hideRecordingLockModal();
-                        this.showToast(`《${newSong.title}》录制完成！已收入置顶歌单`);
                         this.playSingleSongObject(newSong, true);
+                        this.showTempLinkPermanentNotice(newSong.title);
                     } catch (err) {
                         this.hideRecordingLockModal();
                         this.showToast('录制失败：' + err.message);
@@ -16317,7 +17812,7 @@ ${titleHint ? `【指定歌名方向】：《${titleHint}》\n` : ''}${userPromp
                     if (!apiKey) return this.showToast('请先在「设置 - 音乐API」中填写 API Key');
                     if (!clipId) return this.showToast('请填写源歌曲片段 clipId');
 
-                    this.showRecordingLockModal('正在提取专属声线', '正在从歌曲片段中克隆固化声线 ID，请勿退出...');
+                    this.showRecordingLockModal('正在提取专属声线', '正在从歌曲片段中克隆声线ID，请勿退出...');
                     try {
                         const submitUrl = `${baseUrl}/api/cqt/generator/suno`;
                         const res = await fetch(submitUrl, {
@@ -16368,7 +17863,7 @@ ${titleHint ? `【指定歌名方向】：《${titleHint}》\n` : ''}${userPromp
                                     const inp = document.getElementById('wx-set-singing-persona');
                                     if (inp) inp.value = newPersonaId;
                                     this.hideRecordingLockModal();
-                                    this.copyTextToClipboard(newPersonaId, `专属声线 ID (${newPersonaId}) 生成并绑定成功！`);
+                                    this.copyTextToClipboard(newPersonaId, `专属声线ID (${newPersonaId}) 生成并绑定成功！`);
                                     return;
                                 }
                             } else if (st === 'failed' || st === 'error') {
@@ -16427,6 +17922,7 @@ ${titleHint ? `【指定歌名方向】：《${titleHint}》\n` : ''}${userPromp
                         const clipB = clips[1] || null;
                         const completedSong = {
                             id: 'suno_' + (clipA.id || Date.now()),
+                            sunoTaskId: clipA.sunoTaskId || '',
                             clipId: clipA.id || '',
                             clipIdB: clipB ? clipB.id : '',
                             title: clipA.title || songTitle,
@@ -16459,7 +17955,7 @@ ${titleHint ? `【指定歌名方向】：《${titleHint}》\n` : ''}${userPromp
 
                         this.hideRecordingLockModal();
                         if (window.WeChatSys) window.WeChatSys.renderMessages(true, 'all');
-                        this.showToast(`《${completedSong.title}》重新录制成功！`);
+                        this.showTempLinkPermanentNotice(completedSong.title);
                     } catch (err) {
                         this.hideRecordingLockModal();
                         msg.status = 'failed';
@@ -16477,6 +17973,15 @@ ${titleHint ? `【指定歌名方向】：《${titleHint}》\n` : ''}${userPromp
                     if (!chat) return;
                     const msg = (chat.messages || []).find(m => m.id === songId || (m.songData && m.songData.id === songId));
                     if (!msg || !msg.songData) return;
+
+                    // 优先与听歌 APP 置顶歌单中的同名/同ID曲目同步最新状态（确保在听歌APP缓存或更新链接后聊天卡片立即可用）
+                    this.initData();
+                    const prof = this.getActiveProfile();
+                    const syncedSong = (prof.charSongs || []).find(s => s.id === msg.songData.id || (s.clipId && s.clipId === msg.songData.clipId));
+                    if (syncedSong) {
+                        const keepVer = msg.songData.activeVer || syncedSong.activeVer || 'A';
+                        Object.assign(msg.songData, syncedSong, { activeVer: keepVer });
+                    }
 
                     const curTrack = this.playlistQueue[this.curTrackIdx];
                     if (curTrack && curTrack.id === msg.songData.id) {
@@ -16783,7 +18288,7 @@ ${titleHint ? `【指定歌名方向】：《${titleHint}》\n` : ''}${userPromp
             };
         </script>
         <!-- ========================================================= -->
-        <!-- [APP: 听歌 (Music Hub)] 独立完整区域结束 -->
+        <!-- [APP: 听歌结束 -->
         <!-- ========================================================= -->
 
 
@@ -56590,7 +58095,7 @@ ${modelReply}
 
 
 <!-- ========================================================= -->
-<!--[APP: 微信/聊天系统 (WeChat Hub)] 独立高定版 V8 -->
+<!--[APP: 聊天独立高定版 V8 -->
 <!-- ========================================================= -->
 <style>
     :root {
@@ -58969,6 +60474,8 @@ ${modelReply}
                         }
                         else if(lastMsg.type==='trv_item_share') msgText=`[旅行推荐: ${(lastMsg.snapshotItem && lastMsg.snapshotItem.name) || '精选目的地'}]`;
                         else if(lastMsg.type==='trv_list_share') msgText=`[旅行清单: ${lastMsg.listTitle || '出行方案'}]`;
+                        else if(lastMsg.type==='music_share') msgText=`[音乐分享: ${(lastMsg.songData && lastMsg.songData.title) || '歌曲'}]`;
+                        else if(lastMsg.type==='char_song') msgText=`[专属演唱: ${(lastMsg.songData && lastMsg.songData.title) || lastMsg.songTitle || '原创单曲'}]`;
                         else msgText=lastMsg.zh || lastMsg.body || '[系统]';
                     }
                     const timeText = lastMsg ? this.formatMsgTime(lastMsg.ts) : '';
@@ -59385,6 +60892,31 @@ ${modelReply}
                         <div style="display:flex; justify-content:space-between; align-items:center; padding-top:6px; border-top:0.5px solid rgba(255,255,255,0.1); font-size:10px; color:rgba(255,255,255,0.55);">
                             <span>${isReady ? '已自动收录至《TA 为我唱的歌》' : (isFailed ? '点击卡片可重新合成歌曲' : '合成完毕后自动收录至听歌')}</span>
                             ${abBadge}
+                        </div>
+                    </div>`;
+                } else if (msg.type === 'music_share') {
+                    const sd = msg.songData || {};
+                    const isCurPlaying = window.MusicAppSys && window.MusicAppSys.isPlaying && window.MusicAppSys.playlistQueue[window.MusicAppSys.curTrackIdx]?.id === sd.id;
+                    const coverStyle = sd.cover ? `background-image:url('${sd.cover}'); background-size:cover; background-position:center;` : 'background:#e63946;';
+                    const creatorTag = sd.isCharSong ? `${sd.charName || sd.artist || '角色'} 原创演唱` : (sd.artist || '精选单曲');
+
+                    bodyHtml = `
+                    <div class="wx-vinyl-bubble-card" onclick="window.MusicAppSys.playChatSongBubble('${msg.id}', '${chat.id}', event)" style="cursor:pointer; background:linear-gradient(135deg, #251b24 0%, #15151a 100%);">
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <div class="wx-vinyl-disc-mini ${isCurPlaying ? 'playing' : ''}" data-song-id="${sd.id || ''}">
+                                <div style="width:22px; height:22px; border-radius:50%; ${coverStyle}"></div>
+                            </div>
+                            <div style="flex:1; min-width:0;">
+                                <div style="font-size:13.5px; font-weight:700; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${sd.title || '分享音乐'}</div>
+                                <div style="font-size:11px; color:#ff758f; font-weight:600; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${creatorTag}</div>
+                            </div>
+                            <div style="width:30px; height:30px; border-radius:15px; background:#e63946; display:flex; align-items:center; justify-content:center; flex-shrink:0; box-shadow:0 3px 10px rgba(230,57,70,0.35);">
+                                ${isCurPlaying ? '<svg viewBox="0 0 24 24" width="13" height="13" fill="#fff"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>' : '<svg viewBox="0 0 24 24" width="13" height="13" fill="#fff" style="margin-left:1px;"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>'}
+                            </div>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; padding-top:6px; border-top:0.5px solid rgba(255,255,255,0.08); font-size:10px; color:rgba(255,255,255,0.5);">
+                            <span>黑胶云音乐</span>
+                            <span style="color:rgba(255,255,255,0.75);">点击播放 ♪</span>
                         </div>
                     </div>`;
                 } else if (msg.type === 'voice_msg') {
@@ -59889,7 +61421,7 @@ ${modelReply}
 
                 let multiClass = '';
                 let checkedClass = this.multiSelectedIdxs.includes(idx) ? 'checked' : '';
-                let isSpecialType = ['image', 'sticker', 'dice', 'redpacket', 'takeaway', 'undercover_init', 'undercover_vote', 'forward_history', 'essay_share', 'weibo_share', 'xj_chat_share', 'xj_order_share', 'wm_order_card', 'wm_store_share', 'trv_order_card', 'trv_item_share', 'trv_list_share', 'char_song'].includes(msg.type);
+                let isSpecialType = ['image', 'sticker', 'dice', 'redpacket', 'takeaway', 'undercover_init', 'undercover_vote', 'forward_history', 'essay_share', 'weibo_share', 'xj_chat_share', 'xj_order_share', 'wm_order_card', 'wm_store_share', 'trv_order_card', 'trv_item_share', 'trv_list_share', 'char_song', 'music_share'].includes(msg.type);
 let specialClass = isSpecialType ? 'sticker' : '';
 
                 let nameHtml = `<div class="wx-msg-name"></div>`;
@@ -60205,6 +61737,14 @@ let specialClass = isSpecialType ? 'sticker' : '';
                     }
                     if(m.type==='trv_list_share') {
                         content = this.formatTravelListShareForLLM(m);
+                    }
+                    if(m.type==='music_share' || m.type==='char_song') {
+                        const sd = m.songData || {};
+                        const sTitle = sd.title || m.songTitle || '未知歌曲';
+                        const sArtist = sd.charName || sd.artist || '未知歌手';
+                        const creatorDesc = sd.isCharSong ? `由角色「${sArtist}」亲自作词作曲并演唱的专属原创歌曲` : `歌手/创作者：「${sArtist}」`;
+                        const lyricsInfo = sd.rawLyrics ? `，完整歌词内容如下：\n${sd.rawLyrics}` : '';
+                        content = `[${m.type==='music_share' ? '分享了音乐卡片' : '录制并发送了黑胶歌曲卡片'}：《${sTitle}》（${creatorDesc}）${lyricsInfo}]`;
                     }
                     if(m.type==='vote') content = `[发起投票: ${m.title}]`;
                     if(m.type==='undercover_init') {
@@ -61414,6 +62954,7 @@ sysPrompt += `
                             const clipB = clips[1] || null;
                             const completedSong = {
                                 id: 'suno_' + (clipA.id || Date.now()),
+                                sunoTaskId: clipA.sunoTaskId || '',
                                 clipId: clipA.id || '',
                                 clipIdB: clipB ? clipB.id : '',
                                 title: clipA.title || pendingSingTask.songTitle,
@@ -61447,7 +62988,7 @@ sysPrompt += `
 
                             window.MusicAppSys.hideRecordingLockModal();
                             if (isCurrentView) this.renderMessages(true, 'all');
-                            this.showToast(`《${completedSong.title}》录制完成，点击黑胶即可播放`);
+                            window.MusicAppSys.showTempLinkPermanentNotice(completedSong.title);
                         } catch (singErr) {
                             console.error('[Suno 聊天录制异常]:', singErr);
                             window.MusicAppSys.hideRecordingLockModal();
@@ -63519,15 +65060,9 @@ sysPrompt += `
                                 <option value="f" ${sGender === 'f' ? 'selected' : ''}>女声 (f)</option>
                             </select>
                         </div>
-                        <div class="ins-item" style="padding:10px 0; justify-content:space-between;">
+                        <div class="ins-item" style="padding:10px 0; border:none; justify-content:space-between;">
                             <span style="white-space:nowrap;">专属声线 ID (personaId)</span>
                             <textarea id="wx-set-singing-persona" rows="1" placeholder="选填，固定唱歌音色" style="width:155px; text-align:right; outline:none; border:1px solid #e5e5ea; border-radius:4px; padding:4px 8px; font-size:12px; color:#555; background:transparent; resize:none; overflow:hidden; height:26px; line-height:16px; box-sizing:border-box; font-family:monospace;">${sPersona}</textarea>
-                        </div>
-                        <div style="background:#f9f9fb; border-radius:10px; padding:10px; margin-top:6px; border:1px solid #efefef;">
-                            <div style="font-size:11.5px; font-weight:600; color:#262626; margin-bottom:6px;">生成新的唱歌声音 ID (5积分/次)</div>
-                            <textarea id="wx-persona-clip-id" rows="1" placeholder="输入源歌曲片段 clipId (或从已唱歌曲提取)" style="width:100%; height:32px; line-height:18px; border:1px solid #e5e5ea; border-radius:6px; padding:6px 8px; font-size:12px; background:#fff; box-sizing:border-box; outline:none; resize:none; overflow:hidden; margin-bottom:6px; font-family:monospace;"></textarea>
-                            <textarea id="wx-persona-style" rows="1" placeholder="声线特征描述 (如: soulful vocals, R&B, warm)" style="width:100%; height:32px; line-height:18px; border:1px solid #e5e5ea; border-radius:6px; padding:6px 8px; font-size:12px; background:#fff; box-sizing:border-box; outline:none; resize:none; overflow:hidden; margin-bottom:8px; font-family:inherit;">warm emotional vocals, pop</textarea>
-                            <button type="button" onclick="window.MusicAppSys.createVocalPersonaFromClip('${targetChar.id}', document.getElementById('wx-persona-clip-id').value.trim(), '${targetChar.name}', document.getElementById('wx-persona-style').value.trim())" style="width:100%; padding:8px 0; border-radius:8px; border:none; background:#262626; color:#fff; font-size:12.5px; font-weight:600; cursor:pointer;">提取并绑定为 TA 的固定唱歌声线</button>
                         </div>
                     </div>
                 </div>`;
@@ -65808,7 +67343,7 @@ generateVoice: async function(text, voiceId, speed = 1.0) {
         }, 60000);
     }, 200);
 </script>
-<!-- ================= END 微信系统 ================= -->
+<!-- ================= END 聊天结束 ================= -->
 
 
 
