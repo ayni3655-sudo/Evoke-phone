@@ -17473,9 +17473,9 @@ ${creatorInstruction}
                     let wbContext = '';
 
                     if (c) {
-                        // 1. 历史事件总结：仅提取并截取最近 300 字
-                        const chatSummaries = (c.summaries || []).map(s => `[${s.date || ''} ${s.time || ''}] ${s.title || ''}: ${s.content || s.desc || ''}`).join('\n');
-                        const otherMems = (c.otherMemories || []).map(o => `[${o.date || ''}] ${o.title || ''}: ${o.content || o.desc || ''}`).join('\n');
+                        // 1. 历史事件总结：仅提取并截取最近 300 字（剥离具体几点几分的时间戳，防止误导AI以为是深夜）
+                        const chatSummaries = (c.summaries || []).map(s => `${s.title || ''}: ${s.content || s.desc || ''}`).join('\n');
+                        const otherMems = (c.otherMemories || []).map(o => `${o.title || ''}: ${o.content || o.desc || ''}`).join('\n');
                         const combinedSummaries = [chatSummaries, otherMems].filter(Boolean).join('\n').trim();
                         if (combinedSummaries) {
                             recentSummary300 = combinedSummaries.length > 300
@@ -17523,6 +17523,7 @@ ${titleHint ? `【歌名参考】：《${titleHint}》\n` : ''}${userPromptHint 
 1. 作词美学与拒绝堆叠（极其重要）：
    - 不预设固定主题，不束缚你的创作题材与情绪方向，由你根据自己的性格气质与当下心境自由发挥。
    - **严禁在歌词中堆叠人设标签、职业设定，严禁像记流水账或写日记一样罗列具体的日常琐事与历史事件**！
+   - **严禁套路化哄睡结尾**：除非灵感要求中明确指定写“晚安曲/哄睡歌”，否则切勿受聊天记录中夜晚或作息话题的影响，**严禁在歌词或结尾段（[Outro]）出现“晚安”、“快睡吧”、“乖乖睡觉”、“闭上眼”、“做个好梦”等催眠哄睡套话**！歌曲结尾应当停留在余韵悠长的画面感、旋律感或情绪意境上。
    - 真正的歌词应当讲究文学美感、韵律节奏、留白与画面意境。请将你们之间的羁绊、情绪或只言片语的触动，提炼升华为富有感染力的音乐意象与诗意表达，写出真正好听、耐品的歌词。
 2. 输出 tags 字段（曲风 + 乐器 + 角色声线画像 —— 必须全英文、逗号分隔）：
    - 结合你的人设气质与本首歌的风格，输出包含曲风流派、情绪氛围、主要乐器、符合你人设的英文声线与唱腔描述词，以及语种标签（${langMeta.tag}），全部使用英文并以逗号分隔。
