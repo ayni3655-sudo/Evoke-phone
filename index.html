@@ -14267,6 +14267,77 @@ if (badgeEl) {
                     this.recoverAndSyncAllCharSongs();
                 },
 
+                // 判断两首角色歌曲是否为同一首歌（多维度比对 id、sunoTaskId、clipId、audioUrl，杜绝产生双份副本）
+                _isSameCharSong: function(a, b) {
+                    if (!a || !b) return false;
+                    if (a.id && b.id && a.id === b.id) return true;
+                    if (a.sunoTaskId && b.sunoTaskId && a.sunoTaskId === b.sunoTaskId) return true;
+                    if (a.clipId && b.clipId && a.clipId === b.clipId) return true;
+                    if (a.clipId && b.clipIdB && a.clipId === b.clipIdB) return true;
+                    if (a.clipIdB && b.clipId && a.clipIdB === b.clipId) return true;
+                    if (a.audioUrl && b.audioUrl && a.audioUrl === b.audioUrl) return true;
+                    if (a.audioUrl && b.audioUrlB && a.audioUrl === b.audioUrlB) return true;
+                    if (a.audioUrlB && b.audioUrl && a.audioUrlB === b.audioUrl) return true;
+                    return false;
+                },
+
+                // 安全向面具的《TA为我唱的歌》歌单添加或合并更新单曲（保证同一首歌只存在1条记录，内含A/B双版本）
+                _addOrUpdateCharSong: function(prof, songObj) {
+                    if (!prof || !songObj || !songObj.audioUrl) return false;
+                    if (!Array.isArray(prof.charSongs)) prof.charSongs = [];
+                    const existIdx = prof.charSongs.findIndex(exist => this._isSameCharSong(exist, songObj));
+                    if (existIdx !== -1) {
+                        const existSong = prof.charSongs[existIdx];
+                        // 若传入的实际上是同一任务的B版本片段，且原记录缺少B版本，则自动合并为B版本
+                        if (!existSong.audioUrlB && songObj.audioUrl && songObj.audioUrl !== existSong.audioUrl) {
+                            existSong.audioUrlB = songObj.audioUrl;
+                            if (songObj.clipId && songObj.clipId !== existSong.clipId) {
+                                existSong.clipIdB = songObj.clipId;
+                            }
+                        }
+                        Object.assign(existSong, songObj, {
+                            audioUrl: existSong.audioUrl || songObj.audioUrl,
+                            audioUrlB: songObj.audioUrlB || existSong.audioUrlB || '',
+                            clipId: existSong.clipId || songObj.clipId || '',
+                            clipIdB: songObj.clipIdB || existSong.clipIdB || '',
+                            activeVer: existSong.activeVer || songObj.activeVer || 'A'
+                        });
+                        return false;
+                    } else {
+                        prof.charSongs.unshift(JSON.parse(JSON.stringify(songObj)));
+                        return true;
+                    }
+                },
+
+                // 对指定歌单数组执行原地深度去重与A/B合并
+                _dedupeCharSongArray: function(arr) {
+                    if (!Array.isArray(arr) || arr.length <= 1) return false;
+                    const uniqueList = [];
+                    let changed = false;
+                    for (const item of arr) {
+                        if (!item || !item.audioUrl) {
+                            changed = true;
+                            continue;
+                        }
+                        const exist = uniqueList.find(u => this._isSameCharSong(u, item));
+                        if (exist) {
+                            changed = true;
+                            if (!exist.audioUrlB && item.audioUrlB) exist.audioUrlB = item.audioUrlB;
+                            if (!exist.clipIdB && item.clipIdB) exist.clipIdB = item.clipIdB;
+                            if (!exist.audioUrlB && item.audioUrl && item.audioUrl !== exist.audioUrl) {
+                                exist.audioUrlB = item.audioUrl;
+                                if (item.clipId && item.clipId !== exist.clipId) exist.clipIdB = item.clipId;
+                            }
+                        } else {
+                            uniqueList.push(item);
+                        }
+                    }
+                    if (changed) {
+                        arr.splice(0, arr.length, ...uniqueList);
+                    }
+                    return changed;
+                },
+
                 // 自动扫描微信聊天记录与所有面具分支，无损找回并修复以前角色写的所有歌曲存档
                 recoverAndSyncAllCharSongs: function() {
                     if (!appData.musicApp || !appData.musicApp.profiles) return;
@@ -14285,20 +14356,24 @@ if (badgeEl) {
                         }
                     };
 
-                    // 1. 先修复当前面具歌单里已有的角色歌曲 clipId
-                    activeProf.charSongs.forEach(s => fixSongClipIds(s));
-
+                    // 1. 先修复并去重所有面具歌单里已有的角色歌曲
                     let hasRecovered = false;
-
-                    // 2. 如果其他面具分支（如 default 或 u_default）里存有角色歌曲而当前面具缺失，自动汇总过来防止因面具ID切换导致看不见
                     Object.keys(appData.musicApp.profiles).forEach(uid => {
+                        const p = appData.musicApp.profiles[uid];
+                        if (p && Array.isArray(p.charSongs)) {
+                            p.charSongs.forEach(s => fixSongClipIds(s));
+                            if (this._dedupeCharSongArray(p.charSongs)) hasRecovered = true;
+                        }
+                    });
+
+                    // 2. 如果其他面具分支里存有角色歌曲而当前面具缺失，自动去重汇总过来
+                    Object.keys(appData.musicApp.profiles).forEach(uid => {
+                        if (uid === this.currentUserId) return;
                         const p = appData.musicApp.profiles[uid];
                         if (p && Array.isArray(p.charSongs)) {
                             p.charSongs.forEach(s => {
                                 if (s && s.audioUrl) {
-                                    fixSongClipIds(s);
-                                    if (!activeProf.charSongs.some(exist => exist.id === s.id || exist.audioUrl === s.audioUrl)) {
-                                        activeProf.charSongs.push(JSON.parse(JSON.stringify(s)));
+                                    if (this._addOrUpdateCharSong(activeProf, s)) {
                                         hasRecovered = true;
                                     }
                                 }
@@ -14306,29 +14381,27 @@ if (badgeEl) {
                         }
                     });
 
-                    // 3. 深度扫描所有微信聊天记录里的角色黑胶唱歌气泡 (char_song)，把曾经生成成功但歌单里丢失的歌曲全部找回！
+                    // 3. 深度扫描所有微信聊天记录里已完成的角色黑胶唱歌气泡 (char_song)，去重找回
                     if (Array.isArray(appData.chats)) {
                         appData.chats.forEach(chat => {
                             (chat.messages || []).forEach(msg => {
-                                if (msg && msg.type === 'char_song' && msg.songData && msg.songData.audioUrl) {
+                                if (msg && msg.type === 'char_song' && msg.status === 'ready' && msg.songData && msg.songData.audioUrl) {
                                     const sd = msg.songData;
                                     fixSongClipIds(sd);
                                     const chatUid = (chat.settings && chat.settings.linkedUser && chat.settings.linkedUser !== 'default')
                                         ? chat.settings.linkedUser
                                         : this.currentUserId;
                                     const targetProf = this.ensureUserProfile(chatUid);
-                                    if (!targetProf.charSongs.some(exist => exist.id === sd.id || exist.audioUrl === sd.audioUrl)) {
-                                        targetProf.charSongs.unshift(JSON.parse(JSON.stringify(sd)));
-                                        hasRecovered = true;
-                                    }
-                                    if (!activeProf.charSongs.some(exist => exist.id === sd.id || exist.audioUrl === sd.audioUrl)) {
-                                        activeProf.charSongs.unshift(JSON.parse(JSON.stringify(sd)));
-                                        hasRecovered = true;
+                                    if (this._addOrUpdateCharSong(targetProf, sd)) hasRecovered = true;
+                                    if (targetProf !== activeProf) {
+                                        if (this._addOrUpdateCharSong(activeProf, sd)) hasRecovered = true;
                                     }
                                 }
                             });
                         });
                     }
+
+                    if (this._dedupeCharSongArray(activeProf.charSongs)) hasRecovered = true;
 
                     if (hasRecovered) {
                         activeProf.charSongs.sort((a, b) => (b.ts || 0) - (a.ts || 0));
@@ -14503,11 +14576,13 @@ if (badgeEl) {
 
                     if (rawTracks.length === 0) return [];
 
-                    // 优先筛选非 VIP (fee !== 1 && fee !== 4) 的可播热歌；若数量不足则补充完整列表
-                    const freeTracks = rawTracks.filter(s => s.fee !== 1 && s.fee !== 4);
-                    const sourcePool = freeTracks.length >= 25 ? freeTracks : rawTracks;
+                    // 深度识别 VIP / 付费专辑 / 试听限制 / 无版权曲目，并将免费歌曲排在前面、VIP歌曲排在后面
+                    const freeTracks = rawTracks.filter(s => !this._isSongVipOrRestricted(s));
+                    const vipTracks = rawTracks.filter(s => this._isSongVipOrRestricted(s));
+                    const sourcePool = freeTracks.length >= 25 ? freeTracks : [...freeTracks, ...vipTracks];
 
                     const normalizedPool = sourcePool.map(s => {
+                        const isVip = this._isSongVipOrRestricted(s);
                         const artists = (s.ar || s.artists || []).map(a => a.name).join(' / ') || '未知歌手';
                         let rawPic = (s.al && s.al.picUrl) || (s.album && s.album.picUrl) || '';
                         rawPic = rawPic.replace(/^http:\/\//i, 'https://');
@@ -14525,12 +14600,28 @@ if (badgeEl) {
                             cover: cover,
                             audioUrl: `https://music.163.com/song/media/outer/url?id=${s.id}.mp3`,
                             duration: Math.floor((s.dt || s.duration || 180000) / 1000),
+                            isVip: isVip,
                             isCharSong: false
                         };
                     });
 
                     this._hotChartFullPool = normalizedPool;
                     return normalizedPool;
+                },
+
+                // 深度检测单曲是否为 VIP 专享、付费数字专辑、仅试听片段或无版权下架歌曲
+                _isSongVipOrRestricted: function(s) {
+                    if (!s) return true;
+                    const fee = Number(s.fee !== undefined ? s.fee : (s.privilege ? s.privilege.fee : 0));
+                    if (fee === 1 || fee === 4) return true;
+                    if (s.noCopyrightRcmd !== null && s.noCopyrightRcmd !== undefined) return true;
+                    if (s.privilege) {
+                        if (s.privilege.fee === 1 || s.privilege.fee === 4) return true;
+                        if (s.privilege.pl !== undefined && Number(s.privilege.pl) === 0) return true;
+                        if (s.privilege.freeTrialInfo !== null && s.privilege.freeTrialInfo !== undefined) return true;
+                        if (s.privilege.payed === 0 && (s.privilege.fl === 0 || s.privilege.st < 0)) return true;
+                    }
+                    return false;
                 },
 
                 loadRecommendCategory: async function(kw, chipEl, forceRandom = false) {
@@ -14565,6 +14656,7 @@ if (badgeEl) {
                         const pool = await this.fetchOfficialHotChartPool();
                         if (pool && pool.length > 0) {
                             const picked = this._pickRandomSongs(pool, 25);
+                            picked.sort((a, b) => Number(!!a.isVip) - Number(!!b.isVip));
                             this._currentHomeDisplaySongs = picked;
                             appData.musicApp.dailyRecCache['热歌榜'] = {
                                 date: todayKey,
@@ -14615,13 +14707,15 @@ if (badgeEl) {
                             <span>正在云端检索歌曲...</span>
                         </div>`;
 
-                    // 7条多源高可用搜歌通道（国内镜像 + 国际代理直连网易云官网 + Meting聚合源）
+                    // 优先使用带完整 privilege/fee 权限信息的官方结构镜像源，Meting 仅作断网保底
                     const neteasePcUrl = 'https://music.163.com/api/cloudsearch/pc?s=' + encodeURIComponent(kw) + '&type=1&offset=0&limit=100';
                     const neteaseWebUrl = 'https://music.163.com/api/search/get/web?s=' + encodeURIComponent(kw) + '&type=1&offset=0&total=true&limit=100';
                     const endpoints = [
                         `https://zm.armoe.cn/cloudsearch?keywords=${encodeURIComponent(kw)}&limit=100&offset=0&type=1`,
                         `https://ncm.zhenxin.me/cloudsearch?keywords=${encodeURIComponent(kw)}&limit=100&offset=0&type=1`,
                         `https://music-api.heheda.top/cloudsearch?keywords=${encodeURIComponent(kw)}&limit=100&offset=0&type=1`,
+                        `https://zm.armoe.cn/search?keywords=${encodeURIComponent(kw)}&limit=100&offset=0&type=1`,
+                        `https://ncm.zhenxin.me/search?keywords=${encodeURIComponent(kw)}&limit=100&offset=0&type=1`,
                         `https://corsproxy.io/?${encodeURIComponent(neteasePcUrl)}`,
                         `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(neteasePcUrl)}`,
                         `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(neteaseWebUrl)}`,
@@ -14629,7 +14723,7 @@ if (badgeEl) {
                         `https://api.i-meto.com/meting/api?server=netease&type=search&id=${encodeURIComponent(kw)}`
                     ];
 
-                    const fetchWithTimeout = async (url, ms = 5000) => {
+                    const fetchWithTimeout = async (url, ms = 4500) => {
                         const ctrl = new AbortController();
                         const timer = setTimeout(() => ctrl.abort(), ms);
                         try {
@@ -14645,14 +14739,13 @@ if (badgeEl) {
                     let rawSongs = [];
                     for (let ep of endpoints) {
                         try {
-                            const res = await fetchWithTimeout(ep, 5000);
+                            const res = await fetchWithTimeout(ep, 4500);
                             if (!res.ok) continue;
                             const data = await res.json();
                             if (data?.result?.songs && data.result.songs.length > 0) {
                                 rawSongs = data.result.songs;
                                 break;
                             } else if (Array.isArray(data) && data.length > 0) {
-                                // 兼容 Meting 接口返回的数组格式，自动转为标准网易云格式
                                 rawSongs = data.map(item => {
                                     const sidMatch = String(item.url || item.id || '').match(/id=(\d+)/);
                                     const sid = sidMatch ? sidMatch[1] : String(item.id || Date.now());
@@ -14661,7 +14754,7 @@ if (badgeEl) {
                                         name: item.name || item.title || '未知歌曲',
                                         ar: [{ name: item.artist || item.author || '未知歌手' }],
                                         al: { picUrl: item.pic || item.cover || '' },
-                                        fee: 0,
+                                        fee: item.fee !== undefined ? item.fee : 0,
                                         dt: 210000
                                     };
                                 });
@@ -14673,12 +14766,22 @@ if (badgeEl) {
                     // 如果在等待期间用户已经发起了新的搜索，丢弃旧结果
                     if (reqSeq !== this._searchReqSeq) return;
 
-                    // 优先筛选非 VIP (fee !== 1 && fee !== 4) 的完全免费可播曲目；若触发换一批则随机抽取 25 首
-                    let freeSongs = rawSongs.filter(s => s.fee !== 1 && s.fee !== 4);
-                    let candidateList = freeSongs.length > 0 ? freeSongs : rawSongs;
-                    let finalSongs = (shufflePick || isDailyRecommend)
-                        ? this._pickRandomSongs(candidateList, 25)
-                        : candidateList.slice(0, 25);
+                    // 将完全免费可播曲目与 VIP/受限曲目分离，免费排最前，VIP 往后排
+                    let freeSongs = rawSongs.filter(s => !this._isSongVipOrRestricted(s));
+                    let vipSongs = rawSongs.filter(s => this._isSongVipOrRestricted(s));
+
+                    let finalSongs = [];
+                    if (shufflePick || isDailyRecommend) {
+                        const pickedFree = this._pickRandomSongs(freeSongs, 25);
+                        if (pickedFree.length < 25) {
+                            const pickedVip = this._pickRandomSongs(vipSongs, 25 - pickedFree.length);
+                            finalSongs = [...pickedFree, ...pickedVip];
+                        } else {
+                            finalSongs = pickedFree;
+                        }
+                    } else {
+                        finalSongs = [...freeSongs, ...vipSongs].slice(0, 30);
+                    }
 
                     if (finalSongs.length === 0) {
                         listEl.innerHTML = `<div style="text-align:center; padding:36px 0; color:#8e8e93; font-size:12.5px;">未搜到相关歌曲，请换个关键词试试</div>`;
@@ -14686,15 +14789,14 @@ if (badgeEl) {
                     }
 
                     const normalized = finalSongs.map(s => {
+                        const isVip = this._isSongVipOrRestricted(s);
                         const artists = (s.ar || s.artists || []).map(a => a.name).join(' / ') || '未知歌手';
                         let rawPic = (s.al && s.al.picUrl) || (s.album && s.album.picUrl) || (s.artists && s.artists[0] && s.artists[0].img1v1Url) || '';
                         rawPic = rawPic.replace(/^http:\/\//i, 'https://');
                         let cover = '';
                         if (rawPic) {
-                            // 只有当原链接不含问号参数时，才追加尺寸裁剪参数，防止破坏 Meting 封面重定向链接
                             cover = rawPic.includes('?') ? rawPic : `${rawPic}?param=300y300`;
                         } else if (s.id) {
-                            // 如果搜索通道未返回 picUrl，直接用 Meting 封面重定向直链根据歌曲 ID 自动获取真实专辑封面
                             cover = `https://api.injahow.cn/meting/?type=pic&id=${s.id}`;
                         }
                         return {
@@ -14705,9 +14807,13 @@ if (badgeEl) {
                             cover: cover,
                             audioUrl: `https://music.163.com/song/media/outer/url?id=${s.id}.mp3`,
                             duration: Math.floor((s.dt || s.duration || 180000) / 1000),
+                            isVip: isVip,
                             isCharSong: false
                         };
                     });
+
+                    // 再次确保所有非 VIP 歌曲排在前面，VIP 歌曲排在最后
+                    normalized.sort((a, b) => Number(!!a.isVip) - Number(!!b.isVip));
 
                     this._currentHomeDisplaySongs = normalized;
                     if (isDailyRecommend && normalized.length > 0) {
@@ -16467,14 +16573,31 @@ if (badgeEl) {
                     }
 
                     const endpoints = [
+                        `https://zm.armoe.cn/lyric?id=${songId}`,
+                        `https://ncm.zhenxin.me/lyric?id=${songId}`,
+                        `https://music-api.heheda.top/lyric?id=${songId}`,
                         `https://apis.netstart.cn/music/lyric?id=${songId}`,
                         `https://api.injahow.cn/meting/?type=lrc&id=${songId}`,
+                        `https://api.i-meto.com/meting/api?server=netease&type=lrc&id=${songId}`,
+                        `https://corsproxy.io/?${encodeURIComponent('https://music.163.com/api/song/lyric?id=' + songId + '&lv=1&kv=1&tv=-1')}`,
                         `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent('https://music.163.com/api/song/lyric?id=' + songId + '&lv=1&kv=1&tv=-1')}`
                     ];
+                    const fetchLyricWithTimeout = async (url, ms = 3500) => {
+                        const ctrl = new AbortController();
+                        const timer = setTimeout(() => ctrl.abort(), ms);
+                        try {
+                            const res = await fetch(url, { signal: ctrl.signal });
+                            clearTimeout(timer);
+                            return res;
+                        } catch (err) {
+                            clearTimeout(timer);
+                            throw err;
+                        }
+                    };
                     let rawLrc = '';
                     for (let ep of endpoints) {
                         try {
-                            const res = await fetch(ep);
+                            const res = await fetchLyricWithTimeout(ep, 3500);
                             if (!res.ok) continue;
                             const txt = await res.text();
                             try {
@@ -16482,7 +16605,7 @@ if (badgeEl) {
                                 if (j?.lrc?.lyric) { rawLrc = j.lrc.lyric; break; }
                                 else if (j?.lyric) { rawLrc = j.lyric; break; }
                             } catch (err) {
-                                if (txt && txt.includes('[0')) { rawLrc = txt; break; }
+                                if (txt && (txt.includes('[0') || txt.includes('[ti:'))) { rawLrc = txt; break; }
                             }
                         } catch (e) {}
                     }
@@ -17329,68 +17452,78 @@ ${creatorInstruction}
                     return map[langCode] || map['Chinese'];
                 },
 
-                aiWriteLyricsForCreate: async function() {
-                    const charId = document.getElementById('cm-create-char-sel').value;
+                // 独立专业写歌生成引擎（供听歌创作台与聊天APP唱歌共同调用：不读用户人设、注明用户为女性、历史总结仅取最近300字、避免人设事件堆叠）
+                generateStandaloneSongWork: async function(options = {}) {
+                    const charId = options.charId;
                     const c = (appData.charCards || []).find(x => x.id === charId);
                     const apiConf = appData.settings.api;
-                    if (!apiConf || !apiConf.url || !apiConf.key) return this.showToast('请先配置主 API');
+                    if (!apiConf || !apiConf.url || !apiConf.key) {
+                        throw new Error('请先配置主 API');
+                    }
 
-                    const btn = document.getElementById('cm-ai-write-lyric-btn');
-                    btn.innerText = '正在构思词曲...';
-                    const titleHint = document.getElementById('cm-create-title').value.trim();
-                    const userPromptHint = document.getElementById('cm-create-prompt').value.trim();
-                    const langCode = document.getElementById('cm-create-lang') ? document.getElementById('cm-create-lang').value : 'Chinese';
+                    const titleHint = (options.titleHint || '').trim();
+                    const userPromptHint = (options.userPromptHint || '').trim();
+                    const langCode = options.langCode || 'Chinese';
                     const langMeta = this.getLangMeta(langCode);
-                    const uObj = window.UserSys ? window.UserSys.getEffectiveUser(this.currentUserId) : { name: '你', persona: '' };
+                    const targetUid = options.userId || this.currentUserId || 'default';
+                    const uObj = window.UserSys ? window.UserSys.getEffectiveUser(targetUid) : { name: '你' };
 
-                    // 1. 完整加载并提取该角色在「记忆 APP」中绑定的所有聊天记忆、剧情记忆、其他记忆与近期上下文（不做任何字数截断）
-                    let fullMemoryContext = '';
+                    let recentSummary300 = '';
+                    let recentChatContext = '';
                     let wbContext = '';
+
                     if (c) {
-                        if (window.AIEngine && window.AIEngine.preloadCharMemoryPartitions) {
-                            await window.AIEngine.preloadCharMemoryPartitions([c.id]);
+                        // 1. 历史事件总结：仅提取并截取最近 300 字
+                        const chatSummaries = (c.summaries || []).map(s => `[${s.date || ''} ${s.time || ''}] ${s.title || ''}: ${s.content || s.desc || ''}`).join('\n');
+                        const otherMems = (c.otherMemories || []).map(o => `[${o.date || ''}] ${o.title || ''}: ${o.content || o.desc || ''}`).join('\n');
+                        const combinedSummaries = [chatSummaries, otherMems].filter(Boolean).join('\n').trim();
+                        if (combinedSummaries) {
+                            recentSummary300 = combinedSummaries.length > 300
+                                ? '...' + combinedSummaries.slice(-300)
+                                : combinedSummaries;
                         }
-                        if (window.AIEngine && window.AIEngine.buildCharsMemoryBundle) {
-                            const memBundle = window.AIEngine.buildCharsMemoryBundle([c.id]);
-                            fullMemoryContext = (memBundle.perCharMap[c.id] || '') + '\n' + (memBundle.sharedContextPrompt || '');
+
+                        // 2. 近期聊天记录保持原样读取
+                        const targetChat = options.chatId
+                            ? (appData.chats || []).find(ch => ch.id === options.chatId)
+                            : (appData.chats || []).find(ch => ch.type === 'single' && (ch.targetIds || []).includes(c.id));
+                        if (targetChat && Array.isArray(targetChat.messages)) {
+                            const count = (targetChat.settings && targetChat.settings.historyCount) || 25;
+                            recentChatContext = targetChat.messages.slice(-count).filter(m => m && m.type !== 'system').map(m => {
+                                const sender = m.isUser ? uObj.name : ((appData.charCards || []).find(x => x.id === m.charId)?.name || c.name);
+                                return `${sender}: ${m.zh || m.body || ''}`;
+                            }).filter(line => !line.endsWith(': ')).join('\n');
                         }
-                        // 如果角色还未在记忆APP中手动勾选绑定聊天窗口，自动兜底读取与该角色的单聊近期对话及记忆总结
-                        if (!fullMemoryContext.trim()) {
-                            const chatSummaries = (c.summaries || []).map(s => `[${s.date || ''} ${s.time || ''}] ${s.title || ''}: ${s.content || s.desc || ''}`).join('\n');
-                            const otherMems = (c.otherMemories || []).map(o => `[${o.date || ''}] ${o.title || ''}: ${o.content || o.desc || ''}`).join('\n');
-                            const singleChat = (appData.chats || []).find(ch => ch.type === 'single' && (ch.targetIds || []).includes(c.id));
-                            const recentMsgs = singleChat ? (singleChat.messages || []).slice(-25).map(m => `${m.isUser ? uObj.name : c.name}: ${m.zh || m.body || ''}`).join('\n') : '';
-                            fullMemoryContext = [
-                                chatSummaries ? `【聊天记忆档案】：\n${chatSummaries}` : '',
-                                otherMems ? `【其他记忆档案】：\n${otherMems}` : '',
-                                recentMsgs ? `【近期聊天上下文】：\n${recentMsgs}` : ''
-                            ].filter(Boolean).join('\n\n');
-                        }
+
                         if (c.linkedWb && c.linkedWb.length > 0 && window.AIEngine && window.AIEngine.scanWorldBook) {
-                            wbContext = window.AIEngine.scanWorldBook(fullMemoryContext + '\n' + userPromptHint, c.linkedWb);
+                            wbContext = window.AIEngine.scanWorldBook(recentSummary300 + '\n' + recentChatContext + '\n' + userPromptHint, c.linkedWb);
                         }
                     }
 
-                    const prompt = `请你深度扮演角色「${c ? c.name : '歌手'}」，为「${uObj.name}」创作一首专属原创歌曲。
+                    const prompt = `请你深度扮演角色「${c ? c.name : '歌手'}」，为「${uObj.name}」（性别：女性）创作一首专属原创歌曲。
 
-=== 【你的完整角色设定（未截断）】 ===
+=== 【你的完整角色设定】 ===
 姓名：${c ? c.name : '歌手'}
 副标题/身份：${c ? (c.subtitle || '无') : '无'}
 性格标签：${c ? (c.tags || '无') : '无'}
 详细人设：
 ${c ? (c.desc || '温柔深情') : '温柔深情'}
 ${wbContext ? `\n=== 【关联世界书设定】 ===\n${wbContext}\n` : ''}
-=== 【互动对象（${uObj.name}）设定】 ===
-${uObj.persona || '你最重要的人'}
+=== 【听歌对象基本信息】 ===
+姓名：${uObj.name}（女性）
 
-=== 【你们的完整记忆档案与近期上下文（含聊天记忆、剧情记忆、其他记忆与关联上文）】 ===
-${fullMemoryContext.trim() || '（暂无历史记忆，请结合人设与当下心境自由创作）'}
+=== 【最近历史事件总结（仅最近300字）】 ===
+${recentSummary300 || '（暂无历史总结）'}
 
-${titleHint ? `【指定歌名方向】：《${titleHint}》\n` : ''}${userPromptHint && !userPromptHint.includes('[Verse') ? `【当前写歌灵感/附加要求】：${userPromptHint}\n` : ''}
-=== 【核心创作与格式要求（严格遵守）】 ===
-1. 意境与主题优先（严禁堆砌设定与罗列事件）：
-   - 歌词不需要把所有记忆或人设都塞进去，可以结合当下的心境，确立一个统一的主题。
-   - 歌词要有意境、画面感与情感张力，不要堆砌罗列事件或设定。
+=== 【近期聊天记录】 ===
+${recentChatContext || '（暂无近期聊天记录）'}
+
+${titleHint ? `【歌名参考】：《${titleHint}》\n` : ''}${userPromptHint && !userPromptHint.includes('[Verse') ? `【当前写歌契机/灵感要求】：${userPromptHint}\n` : ''}
+=== 【核心作词与格式要求（严格遵守）】 ===
+1. 作词美学与拒绝堆叠（极其重要）：
+   - 不预设固定主题，不束缚你的创作题材与情绪方向，由你根据自己的性格气质与当下心境自由发挥。
+   - **严禁在歌词中堆叠人设标签、职业设定，严禁像记流水账或写日记一样罗列具体的日常琐事与历史事件**！
+   - 真正的歌词应当讲究文学美感、韵律节奏、留白与画面意境。请将你们之间的羁绊、情绪或只言片语的触动，提炼升华为富有感染力的音乐意象与诗意表达，写出真正好听、耐品的歌词。
 2. 输出 tags 字段（曲风 + 乐器 + 角色声线画像 —— 必须全英文、逗号分隔）：
    - 结合你的人设气质与本首歌的风格，输出包含曲风流派、情绪氛围、主要乐器、符合你人设的英文声线与唱腔描述词，以及语种标签（${langMeta.tag}），全部使用英文并以逗号分隔。
    - 请根据你的人设年龄、性格与嗓音特质，从以下 Suno 官方高权重声线词库中挑选并组合你的声线描述词（连同 male vocals 或 female vocals 一起写进 tags）：
@@ -17399,45 +17532,67 @@ ${titleHint ? `【指定歌名方向】：《${titleHint}》\n` : ''}${userPromp
      * 唱法与情绪：Vocal fry（低音气泡颤音）、Falsetto（假音/转音）、Sensual（慵懒魅惑）、Emotional（饱满情感）
 3. 输出带 Suno 元标签的完整歌词（lyrics 字段）：
    - 使用【${langMeta.name}】创作，整首歌词正文控制在 24~36 行之间（不含元标签行），以保证生成 2~3 分钟的完整歌曲篇幅。
-   - 请在歌词中合理使用方括号元标签来划分歌曲结构（常用元标签包括：[Intro]、[Verse 1]、[Verse 2]、[Pre-Chorus]、[Chorus]、[Interlude]、[Bridge]、[Outro]、[End]；你可以在标签内自由补充英文乐器或唱法提示，也可以只写基础标签，完全根据歌曲情绪自由编排段落结构，不必每次套用固定模板）。
+   - 请在歌词中合理使用方括号元标签来划分歌曲结构（常用元标签包括：[Intro]、[Verse 1]、[Verse 2]、[Pre-Chorus]、[Chorus]、[Interlude]、[Bridge]、[Outro]、[End]；你可以在标签内自由补充英文乐器或唱法提示，也可以只写基础标签，完全根据歌曲情绪自由编排段落结构）。
 4. 严格以 JSON 对象格式输出（不要输出任何解释或多余寒暄）：
 {"title": "歌曲标题", "tags": "全英文曲风+乐器+角色声线画像tags", "lyrics": "包含方括号结构元标签与换行的24~36行完整歌词"}`;
 
+                    let fetchUrl = apiConf.url.endsWith('/chat/completions') ? apiConf.url : apiConf.url.replace(/\/$/, '') + '/chat/completions';
+                    const res = await fetch(fetchUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiConf.key}` },
+                        body: JSON.stringify({ model: apiConf.model || 'gpt-3.5-turbo', messages: [{ role: 'user', content: prompt }], temperature: 0.88 })
+                    });
+                    const data = await res.json();
+                    let rawContent = (data.choices?.[0]?.message?.content || '').trim();
+                    rawContent = rawContent.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+
+                    let parsedObj = null;
+                    const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
+                    if (jsonMatch) {
+                        try { parsedObj = JSON.parse(jsonMatch[0]); } catch (e) {}
+                    }
+
+                    if (parsedObj && parsedObj.lyrics) {
+                        return {
+                            title: String(parsedObj.title || titleHint || `${c ? c.name : ''}的专属曲`).replace(/^《|》$/g, '').trim(),
+                            tags: String(parsedObj.tags || `Pop, Warm, Emotional, ${langMeta.tag}`).trim(),
+                            lyrics: String(parsedObj.lyrics).trim()
+                        };
+                    }
+                    return {
+                        title: titleHint || `${c ? c.name : ''}的专属曲`,
+                        tags: `Pop, Warm, Emotional, ${langMeta.tag}`,
+                        lyrics: rawContent
+                    };
+                },
+
+                aiWriteLyricsForCreate: async function() {
+                    const charId = document.getElementById('cm-create-char-sel').value;
+                    const btn = document.getElementById('cm-ai-write-lyric-btn');
+                    btn.innerText = '正在构思词曲...';
+                    const titleHint = document.getElementById('cm-create-title').value.trim();
+                    const userPromptHint = document.getElementById('cm-create-prompt').value.trim();
+                    const langCode = document.getElementById('cm-create-lang') ? document.getElementById('cm-create-lang').value : 'Chinese';
+
                     try {
-                        let fetchUrl = apiConf.url.endsWith('/chat/completions') ? apiConf.url : apiConf.url.replace(/\/$/, '') + '/chat/completions';
-                        const res = await fetch(fetchUrl, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiConf.key}` },
-                            body: JSON.stringify({ model: apiConf.model || 'gpt-3.5-turbo', messages: [{ role: 'user', content: prompt }], temperature: 0.85 })
+                        const resObj = await this.generateStandaloneSongWork({
+                            charId: charId,
+                            titleHint: titleHint,
+                            userPromptHint: userPromptHint,
+                            langCode: langCode,
+                            userId: this.currentUserId
                         });
-                        const data = await res.json();
-                        let rawContent = (data.choices?.[0]?.message?.content || '').trim();
-                        rawContent = rawContent.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-
-                        let parsedObj = null;
-                        const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
-                        if (jsonMatch) {
-                            try { parsedObj = JSON.parse(jsonMatch[0]); } catch (e) {}
+                        document.getElementById('cm-create-prompt').value = resObj.lyrics;
+                        if (resObj.tags) {
+                            document.getElementById('cm-create-tags').value = resObj.tags;
                         }
-
-                        if (parsedObj && parsedObj.lyrics) {
-                            document.getElementById('cm-create-prompt').value = String(parsedObj.lyrics).trim();
-                            if (parsedObj.tags) {
-                                document.getElementById('cm-create-tags').value = String(parsedObj.tags).trim();
-                            }
-                            if (!titleHint && parsedObj.title) {
-                                document.getElementById('cm-create-title').value = String(parsedObj.title).replace(/^《|》$/g, '').trim();
-                            } else if (!titleHint) {
-                                document.getElementById('cm-create-title').value = `${c ? c.name : ''}的专属曲`;
-                            }
-                        } else {
-                            document.getElementById('cm-create-prompt').value = rawContent;
-                            if (!titleHint) document.getElementById('cm-create-title').value = `${c ? c.name : ''}的专属曲`;
+                        if (!titleHint && resObj.title) {
+                            document.getElementById('cm-create-title').value = resObj.title;
                         }
                         document.getElementById('cm-create-custom-mode').checked = true;
-                        this.showToast('已结合角色记忆生成词曲与声线标签');
+                        this.showToast('已生成词曲与声线标签');
                     } catch (e) {
-                        this.showToast('写词失败，请重试');
+                        this.showToast(e.message || '写词失败，请重试');
                     } finally {
                         btn.innerText = '✨ 让 TA 写词';
                     }
@@ -17792,7 +17947,7 @@ ${titleHint ? `【指定歌名方向】：《${titleHint}》\n` : ''}${userPromp
                         };
 
                         const prof = this.getActiveProfile();
-                        prof.charSongs.unshift(newSong);
+                        this._addOrUpdateCharSong(prof, newSong);
                         saveMusicData();
 
                         this.hideRecordingLockModal();
@@ -17950,7 +18105,11 @@ ${titleHint ? `【指定歌名方向】：《${titleHint}》\n` : ''}${userPromp
                             ? chat.settings.linkedUser
                             : (appData.settings.activeUserId || 'default');
                         const prof = this.ensureUserProfile(chatUid);
-                        prof.charSongs.unshift(completedSong);
+                        this._addOrUpdateCharSong(prof, completedSong);
+                        const activeMusicProf = this.getActiveProfile();
+                        if (activeMusicProf !== prof) {
+                            this._addOrUpdateCharSong(activeMusicProf, completedSong);
+                        }
                         saveMusicData();
 
                         this.hideRecordingLockModal();
@@ -18269,12 +18428,21 @@ ${titleHint ? `【指定歌名方向】：《${titleHint}》\n` : ''}${userPromp
                 syncChatVinylAndFloatingBar: function() {
                     const curTrack = this.playlistQueue[this.curTrackIdx];
                     const wxBar = document.getElementById('wx-floating-lyric-bar');
+                    const playingSvg = '<svg viewBox="0 0 24 24" width="13" height="13" fill="#fff"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>';
+                    const pausedSvg = '<svg viewBox="0 0 24 24" width="13" height="13" fill="#fff" style="margin-left:1px;"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>';
+
                     document.querySelectorAll('.wx-vinyl-disc-mini').forEach(el => {
                         const sid = el.getAttribute('data-song-id');
-                        if (this.isPlaying && curTrack && sid === curTrack.id) {
+                        const isThisPlaying = !!(this.isPlaying && curTrack && sid && sid === curTrack.id);
+                        if (isThisPlaying) {
                             el.classList.add('playing');
                         } else {
                             el.classList.remove('playing');
+                        }
+                        const rowFlex = el.parentElement;
+                        const btnBox = rowFlex ? rowFlex.lastElementChild : null;
+                        if (btnBox && btnBox.querySelector('svg') && !btnBox.querySelector('polyline')) {
+                            btnBox.innerHTML = isThisPlaying ? playingSvg : pausedSvg;
                         }
                     });
                     if (wxBar) {
@@ -61956,22 +62124,8 @@ ${timeGapRule}
                 // 自动检测当前聊天是否开启了读外语/双语，决定角色唱歌使用的语言
                 let isSingingForeign = !!(chat.settings.bilingualVoice || chat.settings.bilingualText || (chat.settings.bilingual && chat.settings.bilingualVoice === undefined));
                 let singLangCode = isSingingForeign ? (chat.settings.lang || 'Japanese') : 'Chinese';
-                let singLangMeta = (window.MusicAppSys && window.MusicAppSys.getLangMeta)
-                    ? window.MusicAppSys.getLangMeta(singLangCode)
-                    : { name: isSingingForeign ? targetLang : '中文（普通话）', tag: isSingingForeign ? `${targetLang} vocals, Pop` : 'Mandarin vocals, C-Pop' };
 
-                sysPrompt += `\n【交互指令】：文本中包含标签可操作：1.\`[掷骰子:点数]\` 2.\`${voiceCmdFormat}\` 3.\`[发送图片:英文画面提示词]\` 4.\`[发送表情:备注]\` 5.\`[唱一首歌:歌曲标题:全英文曲风与角色声线tags:带结构元标签的歌词正文]\`。
-【角色唱歌与写歌规则】：
-1. 触发条件：当 ${uName} 要求你唱歌、写歌，或你想主动为 ${uName} 唱歌时，请在某一条气泡中输出指令：\`[唱一首歌:歌曲标题:全英文曲风与角色声线tags:带结构元标签的歌词正文]\`。平时普通闲聊不要滥用。
-2. 词曲与声线格式要求（该指令享有绝对字数豁免权，不受气泡25字限制）：
-   - 歌曲标题：贴合主题的歌名（不要包含冒号）。
-   - 全英文曲风与角色声线tags（必须全英文、逗号分隔）：包含曲风流派、情绪氛围、主要乐器、符合你人设气质的英文声线与唱腔描述词，以及语种标签 \`${singLangMeta.tag}\`，不要包含冒号。请根据你的人设年龄、性格与嗓音特质，从以下 Suno 官方高权重声线词库中挑选并组合你的声线描述词（连同 male vocals 或 female vocals 一起写进 tags）：
-     * 音域定位：Tenor（少年音/清亮青年男高音）、Baritone（醇厚磁性男中音）、Deep Bass（低沉低音炮/低音大叔）、Alto（醇厚成熟女中音/御姐音）、Soprano（清透高亢女高音/少女音）
-     * 音色与质感：Husky / Raspy / Gravelly（微沙哑颗粒感/烟嗓/沧桑感）、Breathy / Whispering（气声/耳语感/气泡音/温柔贴耳）、Clear / Bright（干净/清冷/清透）、Warm / Gentle（温润/暖意）、Airy / Ethereal（空灵感）
-     * 唱法与情绪：Vocal fry（低音气泡颤音）、Falsetto（假音/转音）、Sensual（慵懒魅惑）、Emotional（饱满情感）
-   - 带结构元标签的歌词正文：
-     ① **意境与篇幅**：不需要把所有记忆和设定都写进去，结合当下心境确立一个主题，歌词要有意境，不要堆砌罗列事件或设定。使用【${singLangMeta.name}】创作 **24~36 行**完整歌词。
-     ② **结构元标签写法**：为避免与外层指令方括号冲突，歌词内的段落元标签请用圆括号书写（可用标签如 \`(Intro)\`、\`(Verse 1)\`、\`(Verse 2)\`、\`(Pre-Chorus)\`、\`(Chorus)\`、\`(Interlude)\`、\`(Bridge)\`、\`(Outro)\`、\`(End)\`，括号内可按需附带英文乐器或唱法提示，段落结构由你根据歌曲自由编排），各行之间用斜杠 \`/\` 分隔，歌词内不要出现冒号 \`:\` 或方括号 \`[\` \`]\`。
+                sysPrompt += `\n【交互指令】：文本中包含标签可操作：1.\`[掷骰子:点数]\` 2.\`${voiceCmdFormat}\` 3.\`[发送图片:英文画面提示词]\` 4.\`[发送表情:备注]\` 5.\`[唱一首歌:歌曲标题:想表达的心境或方向]\`（仅当 ${uName} 明确要求你唱歌/写歌，或特定浪漫氛围下你想主动为 ${uName} 唱一首歌时才可使用此指令；不需要在聊天气泡里写歌词，系统会自动为你接管专门的词曲创作与录制，你只需在前后气泡中像平时一样自然聊天互动即可，平时闲聊严禁滥用）。
 【语音条强约束】：使用 \`${voiceCmdFormat}\` 时，冒号后面的内容【绝对禁止】包含任何动作描写、神态描写、颜文字或括号注解，必须是纯粹的口语台词文字！
 【发图互动】：当用户要求看照片、自拍或合照时，可以使用 \`[发送图片:英文画面提示词]\` 指令（必须是纯英文，享有字数豁免权不受气泡字数限制，建议40-80个英文单词，严禁描写无关陌生人）：
 - 若为角色与${uName}的双人合照：开头必须固定使用 \`two people together, \` 或 \`couple photo, \` 开头，并分别详细写明两人各自的服饰款式与颜色、互动姿势、镜头视角与背景光影；
@@ -62640,21 +62794,18 @@ sysPrompt += `
                         rawStr = rawStr.replace(rejTa[0], ''); 
                     }
 
-                     // AI 决定为用户唱一首歌 -> 兼容多行长歌词、斜杠分隔与圆括号结构元标签自动转译，自动透传当前语种设置
-                    let singMatch = rawStr.match(/\[唱一首歌[:：]([^:：\n]+)[:：]([^:：\n]+)[:：]([\s\S]+)\]/);
+                     // AI 决定为用户唱一首歌 -> 捕获轻量级唱歌指令，交由独立写歌引擎生成高水准词曲，与普通聊天气泡互不干扰
+                    let singMatch = rawStr.match(/\[唱一首歌[:：]([^\]]+)\]/);
                     let pendingSingTask = null;
                     if (singMatch) {
-                        let cleanedLyrics = singMatch[3].trim()
-                            .replace(/\s*\/\s*/g, '\n') // 将斜杠分隔符统一转为标准换行
-                            .replace(/\((Intro|Verse\s*\d*|Pre-Chorus|Chorus|Interlude|Instrumental|Bridge|Solo|Guitar\s*Solo|Piano\s*Solo|Outro|End)(?:\s+([^)]+))?\)/gi, ( _m, tag, desc ) => {
-                                return desc ? `\n[${tag}: ${desc.trim()}]\n` : `\n[${tag}]\n`;
-                            })
-                            .replace(/\n{3,}/g, '\n\n')
-                            .trim();
+                        let singParts = singMatch[1].split(/[:：]/).map(s => s.trim());
+                        let initTitle = (singParts[0] || '').replace(/^《|》$/g, '').trim() || `${charName}的歌`;
+                        let moodHint = singParts.slice(1).join('：').trim();
                         pendingSingTask = {
-                            songTitle: singMatch[1].trim() || `${charName}的歌`,
-                            songTags: singMatch[2].trim() || 'Pop, Warm, Emotional',
-                            songLyrics: cleanedLyrics || '为你唱一首温柔的歌',
+                            songTitle: initTitle,
+                            moodHint: moodHint,
+                            songTags: '',
+                            songLyrics: '',
                             lang: singLangCode,
                             charId: charId,
                             charName: charName
@@ -62935,11 +63086,38 @@ sysPrompt += `
                         if (isCurrentView) this.renderMessages(false, 'append');
 
                         window.MusicAppSys.showRecordingLockModal(
-                            `${pendingSingTask.charName} 正在为你录制《${pendingSingTask.songTitle}》`,
-                            '正在合成专属歌声与黑胶唱片，约需 1~2 分钟，请勿退出当前聊天页面...'
+                            `${pendingSingTask.charName} 正在为你创作并录制《${pendingSingTask.songTitle}》`,
+                            '正在由专属作词引擎构思词曲并合成黑胶唱片，约需1~2分钟，请勿退出当前聊天页面...'
                         );
 
                         try {
+                            const chatUidForSong = (chat.settings && chat.settings.linkedUser && chat.settings.linkedUser !== 'default')
+                                ? chat.settings.linkedUser
+                                : (appData.settings.activeUserId || 'default');
+
+                            // 若尚未通过独立写歌引擎生成歌词，此时单独调用专属写歌提示词生成高水准词曲
+                            if (!pendingSingTask.songLyrics || !pendingSingTask.songTags) {
+                                window.MusicAppSys._lastPollStatusText = '正在潜心创作歌词与编曲';
+                                const work = await window.MusicAppSys.generateStandaloneSongWork({
+                                    charId: pendingSingTask.charId,
+                                    chatId: chat.id,
+                                    userId: chatUidForSong,
+                                    titleHint: pendingSingTask.songTitle,
+                                    userPromptHint: pendingSingTask.moodHint || '',
+                                    langCode: pendingSingTask.lang
+                                });
+                                pendingSingTask.songTitle = work.title || pendingSingTask.songTitle;
+                                pendingSingTask.songTags = work.tags || 'Pop, Warm, Emotional';
+                                pendingSingTask.songLyrics = work.lyrics || '';
+                                placeholderMsg.songTitle = pendingSingTask.songTitle;
+                                placeholderMsg.singRequest = pendingSingTask;
+                                if (placeholderMsg.songData) {
+                                    placeholderMsg.songData.title = pendingSingTask.songTitle;
+                                    placeholderMsg.songData.rawLyrics = pendingSingTask.songLyrics;
+                                }
+                                saveChatData();
+                            }
+
                             const clips = await window.MusicAppSys.createSunoSongTask({
                                 title: pendingSingTask.songTitle,
                                 tags: pendingSingTask.songTags,
@@ -62976,14 +63154,18 @@ sysPrompt += `
                             delete placeholderMsg.errorReason;
                             saveChatData();
 
-                            // 自动收录到当前聊天关联面具的《TA 为我唱的歌》置顶歌单
+                            // 自动去重收录到当前聊天关联面具的《TA 为我唱的歌》置顶歌单（单曲内含A/B双版本）
                             await window.ensurePartitionLoaded('music');
                             window.MusicAppSys.initData();
                             const chatUid = (chat.settings && chat.settings.linkedUser && chat.settings.linkedUser !== 'default')
                                 ? chat.settings.linkedUser
                                 : (appData.settings.activeUserId || 'default');
                             const prof = window.MusicAppSys.ensureUserProfile(chatUid);
-                            prof.charSongs.unshift(completedSong);
+                            window.MusicAppSys._addOrUpdateCharSong(prof, completedSong);
+                            const activeMusicProf = window.MusicAppSys.getActiveProfile();
+                            if (activeMusicProf !== prof) {
+                                window.MusicAppSys._addOrUpdateCharSong(activeMusicProf, completedSong);
+                            }
                             saveMusicData();
 
                             window.MusicAppSys.hideRecordingLockModal();
