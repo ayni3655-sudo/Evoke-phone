@@ -48027,31 +48027,30 @@ ${storyTextRule}
                     let timeStr = this.getPhoneSimulatedTime(story, msgIdx);
                     let bat = this.getPhoneBatteryInfo();
                     let color = isDark ? '#ffffff' : '#111111';
-                    let fillW = Math.max(2, Math.min(13, Math.round((bat.level / 100) * 13)));
+                    let fillW = Math.max(2, Math.min(14, Math.round((bat.level / 100) * 14)));
                     return `
                     <div class="st-phone-status-bar" style="color:${color};">
-                        <div style="font-family: -apple-system, SF Pro Display, Helvetica, sans-serif; font-size: 11.5px; font-weight: 550; margin: 0; padding: 0; line-height: 1; transform: translateX(2px);">${timeStr}</div>
+                        <div style="font-family: -apple-system, SF Pro Display, Helvetica, sans-serif; font-size: 11.5px; font-weight: 600; margin: 0; padding: 0; line-height: 1; transform: translateX(2px);">${timeStr}</div>
                         <div class="st-phone-status-island"></div>
-                        <div class="st-phone-status-icons" style="margin: 0; padding: 0; transform: translateX(-2px);">
+                        <div class="st-phone-status-icons" style="margin: 0; padding: 0; transform: translateX(-2px); display: flex; align-items: center; gap: 5px;">
                             <!-- 信号图标 -->
-                            <svg viewBox="0 0 16 12" width="14" height="10" fill="${color}">
-                                <rect x="1" y="8.5" width="2" height="3" rx="0.5"/>
-                                <rect x="4.5" y="6" width="2" height="5.5" rx="0.5"/>
-                                <rect x="8" y="3.5" width="2" height="8" rx="0.5"/>
-                                <rect x="11.5" y="1" width="2" height="10.5" rx="0.5"/>
+                            <svg viewBox="0 0 17 11" width="14.5" height="9.5" style="display:block; overflow:visible;">
+                                <rect x="1" y="7.5" width="2.3" height="3.5" rx="0.7" style="fill:${color} !important; stroke:none !important;"/>
+                                <rect x="5" y="5.2" width="2.3" height="5.8" rx="0.7" style="fill:${color} !important; stroke:none !important;"/>
+                                <rect x="9" y="2.8" width="2.3" height="8.2" rx="0.7" style="fill:${color} !important; stroke:none !important;"/>
+                                <rect x="13" y="0.5" width="2.3" height="10.5" rx="0.7" style="fill:${color} !important; stroke:none !important;"/>
                             </svg>
-                            <!-- WiFi 图标 (下移重构避免负坐标裁切，彻底修复顶部缺口断裂问题) -->
-                            <svg viewBox="0 0 16 12" width="14" height="10" fill="none" stroke="${color}" stroke-width="1.35" stroke-linecap="round" style="overflow:visible;">
-                                <path d="M1.2 3.6C5.5 0.9 10.5 0.9 14.8 3.6"/>
-                                <path d="M3.4 5.9C6.4 3.9 9.6 3.9 12.6 5.9"/>
-                                <path d="M5.6 8.1C7.1 6.9 8.9 6.9 10.4 8.1"/>
-                                <circle cx="8" cy="10.5" r="0.9" fill="${color}" stroke="none"/>
+                            <!-- WiFi 图标 (强制锁定空心描边，防止变成实心黑月牙) -->
+                            <svg viewBox="0 0 16 12" width="14" height="10" style="display:block; overflow:visible;">
+                                <path d="M1.3 3.6C4.9 0.6 11.1 0.6 14.7 3.6" style="fill:none !important; stroke:${color} !important; stroke-width:1.45px !important; stroke-linecap:round !important;"/>
+                                <path d="M3.8 6.4C6.2 4.4 9.8 4.4 12.2 6.4" style="fill:none !important; stroke:${color} !important; stroke-width:1.45px !important; stroke-linecap:round !important;"/>
+                                <circle cx="8" cy="9.5" r="1.25" style="fill:${color} !important; stroke:none !important;"/>
                             </svg>
-                            <!-- 电池图标 (代码绘制 + 实际电量真实填充) -->
-                            <svg viewBox="0 0 24 12" width="20" height="10" fill="none" style="display:block; margin-right: -1px;">
-                                <rect x="1" y="1" width="19" height="10" rx="3" stroke="${color}" stroke-width="1.2"/>
-                                <rect x="21" y="4" width="1.5" height="4" rx="0.75" fill="${color}"/>
-                                <rect x="2.5" y="2.5" width="${fillW}" height="7" rx="1.5" fill="${color}"/>
+                            <!-- 电池图标 (强制锁定空心外框 + 内部留白电量芯) -->
+                            <svg viewBox="0 0 25 12" width="21" height="10" style="display:block; margin-right: -1px; overflow:visible;">
+                                <rect x="1" y="1" width="19" height="10" rx="2.8" style="fill:none !important; stroke:${color} !important; stroke-width:1.15px !important; opacity:0.45;"/>
+                                <path d="M21.5 4.2 C22.3 4.2 22.8 4.7 22.8 5.5 L22.8 6.5 C22.8 7.3 22.3 7.8 21.5 7.8 Z" style="fill:${color} !important; stroke:none !important; opacity:0.45;"/>
+                                <rect x="3" y="3" width="${fillW}" height="6" rx="1.3" style="fill:${color} !important; stroke:none !important;"/>
                             </svg>
                         </div>
                     </div>`;
@@ -48063,11 +48062,12 @@ ${storyTextRule}
 
                     let hasExplicitGroup = /\[群聊发送/i.test(rawContent);
                     let detectedCharNames = [];
-                    let senderTagRegex = /\[([^:：\]]+?)发送[：:]/g;
+                    // 完整识别单聊消息、表情包、群聊消息中的发送者角色名
+                    let senderTagRegex = /\[(?:群聊发送(?:消息|手机消息)[：:]([^:：\]]+)[：:]|([^:：\]]+?)发送(?:消息|手机消息|表情)?[：:])/g;
                     let sMatch;
                     while ((sMatch = senderTagRegex.exec(rawContent)) !== null) {
-                        let sName = sMatch[1].trim();
-                        if (sName && !sName.includes('用户') && sName !== myName && sName.toLowerCase() !== 'user' && !detectedCharNames.includes(sName)) {
+                        let sName = (sMatch[1] || sMatch[2] || '').trim();
+                        if (sName && sName !== '群聊' && !sName.includes('用户') && !sName.includes('在手机') && sName !== myName && sName.toLowerCase() !== 'user' && !detectedCharNames.includes(sName)) {
                             detectedCharNames.push(sName);
                         }
                     }
@@ -48085,19 +48085,50 @@ ${storyTextRule}
                         phoneTitle = story.name || "微信消息";
                     }
 
-                    // 核心：自动将上一条用户发的消息置顶于新手机中，并将用户在旧手机底部发送的消息持久保留
+                    // 智能头像生成器：若该角色在剧本创建/编辑时已拉入且有头像，则显示角色头像；否则显示首字+固定随机彩色底色头像
+                    const getSenderAvatarHtml = (senderName) => {
+                        let cleanName = String(senderName || '').trim();
+                        let pulledChar = null;
+                        if (story.chars && Array.isArray(story.chars)) {
+                            for (let cid of story.chars) {
+                                let c = (appData.charCards || []).find(card => String(card.id) === String(cid));
+                                if (c && c.name && c.name.trim() === cleanName) {
+                                    pulledChar = c;
+                                    break;
+                                }
+                            }
+                        }
+                        if (pulledChar && pulledChar.avatar) {
+                            return `<div class="st-phone-avatar" style="background-image:url('${pulledChar.avatar}');"></div>`;
+                        }
+                        const avatarColors = ['#ff9999', '#7a99d8', '#f5c164', '#52b788', '#a561f5', '#ff8200', '#62d3df', '#b5818d', '#5c7cfa', '#e5989b'];
+                        let hash = 0;
+                        for (let i = 0; i < cleanName.length; i++) {
+                            hash = cleanName.charCodeAt(i) + ((hash << 5) - hash);
+                        }
+                        let bgColor = avatarColors[Math.abs(hash) % avatarColors.length];
+                        let firstChar = cleanName.charAt(0) || '角';
+                        return `<div class="st-phone-avatar" style="background-image:none !important; background-color:${bgColor} !important; color:#ffffff !important; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:600; user-select:none;">${firstChar}</div>`;
+                    };
+
+                    // 严格校验是否为小手机输入框发出的专属消息格式，普通正文消息绝不混入小手机或AI正文
+                    const isPhoneUserLine = (str) => /^\[(?:用户发送手机消息|用户发送消息|用户在手机发送消息|.+?在手机发送(?:消息|手机消息))[：:]([\s\S]+)\]$/.test(str);
+
                     let lines = [];
                     if (msgIdx > 0 && story.history[msgIdx - 1] && story.history[msgIdx - 1].isUser) {
                         let prevUserBody = story.history[msgIdx - 1].body || '';
                         prevUserBody.split('\n').forEach(l => {
                             let str = l.trim();
-                            if (str) lines.push(str);
+                            if (str && isPhoneUserLine(str)) lines.push(str);
                         });
                     }
                     rawContent.split('\n').forEach(l => { if (l.trim()) lines.push(l.trim()); });
                     if (msgIdx >= 0 && msgIdx < story.history.length - 1 && story.history[msgIdx + 1] && story.history[msgIdx + 1].isUser) {
                         let nextUserBody = story.history[msgIdx + 1].body || '';
-                        nextUserBody.split('\n').forEach(l => { if (l.trim()) lines.push(l.trim()); });
+                        nextUserBody.split('\n').forEach(l => {
+                            let str = l.trim();
+                            if (str && isPhoneUserLine(str)) lines.push(str);
+                        });
                     }
 
                     let phoneMsgsHtml = '';
@@ -48110,7 +48141,7 @@ ${storyTextRule}
                         let groupMsgMatch = trimmed.match(/^\[群聊发送(?:消息|手机消息)[：:]([^:：]+)[：:]([\s\S]+)\]$/);
                         let singleMsgMatch = trimmed.match(/^\[([^:：\]]+)发送(?:消息|手机消息)[：:]([\s\S]+)\]$/);
                         let userNormalMsgMatch = trimmed.match(/^\[(?:用户发送手机消息|用户发送消息|用户在手机发送消息|.+?在手机发送(?:消息|手机消息))[：:]([\s\S]+)\]$/);
-                        let emoMatch = trimmed.match(/^\[([^:：\]]+)发送表情:([^:：]+)\]$/);
+                        let emoMatch = trimmed.match(/^\[([^:：\]]+)发送表情[：:]([^:：\]]+)\]$/);
 
                         if (userNormalMsgMatch) {
                             let text = userNormalMsgMatch[1].trim().replace(/[。\.]$/, '');
@@ -48143,8 +48174,7 @@ ${storyTextRule}
                                     foreignText = parts.slice(1).join(':').trim();
                                 }
 
-                                let charObj = appData.charCards.find(c => c.name === senderName) || (story.chars && story.chars.length ? appData.charCards.find(c => c.id === story.chars[0]) : null);
-                                let avatarUrl = charObj ? charObj.avatar : 'https://api.dicebear.com/7.x/notionists/svg?seed=Char';
+                                let avatarHtml = getSenderAvatarHtml(senderName);
 
                                 let bilingualHtml = '';
                                 if (pSettings.bilingualText && foreignText) {
@@ -48154,7 +48184,7 @@ ${storyTextRule}
 
                                 phoneMsgsHtml += `
                                 <div class="st-phone-msg-row">
-                                    <div class="st-phone-avatar" style="background-image:url('${avatarUrl}');"></div>
+                                    ${avatarHtml}
                                     <div class="st-phone-bubble-box">
                                         ${isGroup ? `<div class="st-phone-sender-name">${senderName}</div>` : ''}
                                         <div class="st-phone-bubble">
@@ -48169,16 +48199,16 @@ ${storyTextRule}
                                 let senderName = emoMatch[1].trim();
                                 let memo = emoMatch[2].trim();
                                 let isMe = senderName.includes('用户') || senderName === myName;
-                                let charObj = appData.charCards.find(c => c.name === senderName);
-                                let av = isMe ? myAvatar : (charObj ? charObj.avatar : '');
+                                let avatarHtml = isMe ? `<div class="st-phone-avatar" style="background-image:url('${myAvatar}');"></div>` : getSenderAvatarHtml(senderName);
 
                                 let stickerObj = (appData.storyPhoneStickers || []).find(s => s.memo.includes(memo) || memo.includes(s.memo));
                                 let stImg = stickerObj ? `<img src="${stickerObj.url}" style="max-width:110px; max-height:110px; display:block;">` : `[表情包: ${memo}]`;
 
                                 phoneMsgsHtml += `
                                 <div class="st-phone-msg-row ${isMe ? 'user' : ''}">
-                                    <div class="st-phone-avatar" style="background-image:url('${av}');"></div>
+                                    ${avatarHtml}
                                     <div class="st-phone-bubble-box">
+                                        ${isGroup && !isMe ? `<div class="st-phone-sender-name">${senderName}</div>` : ''}
                                         <div style="padding:4px;">${stImg}</div>
                                     </div>
                                 </div>`;
