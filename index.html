@@ -40793,8 +40793,153 @@ ${chronologicalContext || '日常生活状态。'}
 
         <!-- 页面: 故事书架 (主页) -->
         <div id="page-story" class="page-module">
+            <style>
+                /* 右上角加号悬浮选择菜单 */
+                .st-add-menu-pop {
+                    position: absolute;
+                    top: calc(env(safe-area-inset-top, 0px) + 48px);
+                    right: 16px;
+                    width: 158px;
+                    background: rgba(255, 255, 255, 0.96);
+                    backdrop-filter: blur(20px);
+                    -webkit-backdrop-filter: blur(20px);
+                    border-radius: 14px;
+                    border: 0.5px solid rgba(0, 0, 0, 0.08);
+                    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+                    z-index: 300;
+                    display: none;
+                    flex-direction: column;
+                    overflow: hidden;
+                    transform-origin: top right;
+                    animation: fadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+                }
+                .st-add-menu-pop.show {
+                    display: flex;
+                }
+                .st-add-menu-item {
+                    padding: 13px 16px;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    font-size: 13.5px;
+                    font-weight: 500;
+                    color: #1c1c1e;
+                    cursor: pointer;
+                    border-bottom: 0.5px solid rgba(0, 0, 0, 0.05);
+                    transition: background 0.15s;
+                    user-select: none;
+                }
+                .st-add-menu-item:last-child {
+                    border-bottom: none;
+                }
+                .st-add-menu-item:active {
+                    background: rgba(0, 0, 0, 0.05);
+                }
+                .st-add-menu-item svg {
+                    width: 17px;
+                    height: 17px;
+                    stroke: #262626;
+                    stroke-width: 1.8;
+                    flex-shrink: 0;
+                }
+
+                /* AI 生成剧本高定全屏工坊样式 */
+                .st-ai-gen-check-grid {
+                    display: grid;
+                    grid-template-columns: repeat(3, 1fr);
+                    gap: 10px;
+                    padding: 4px 0;
+                }
+                .st-ai-check-pill {
+                    display: flex;
+                    align-items: center;
+                    justify-content: flex-start;
+                    gap: 8px;
+                    padding: 10px 12px;
+                    border-radius: 12px;
+                    background: #f5f5f7;
+                    border: 1.5px solid #e5e5ea;
+                    font-size: 12.5px;
+                    font-weight: 500;
+                    color: #666;
+                    cursor: pointer;
+                    user-select: none;
+                    transition: all 0.2s ease;
+                }
+                .st-ai-check-pill.active {
+                    background: #f0f2f5;
+                    border-color: #262626;
+                    color: #1c1c1e;
+                    font-weight: 600;
+                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+                }
+                .st-ai-check-box {
+                    width: 17px;
+                    height: 17px;
+                    border-radius: 5px;
+                    border: 1.5px solid #c7c7cc;
+                    background: #ffffff;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: all 0.18s ease;
+                    flex-shrink: 0;
+                }
+                .st-ai-check-box svg {
+                    width: 12px;
+                    height: 12px;
+                    stroke: #ffffff;
+                    stroke-width: 3;
+                    opacity: 0;
+                    transform: scale(0.5);
+                    transition: all 0.18s ease;
+                }
+                .st-ai-check-pill.active .st-ai-check-box {
+                    background: #262626;
+                    border-color: #262626;
+                }
+                .st-ai-check-pill.active .st-ai-check-box svg {
+                    opacity: 1;
+                    transform: scale(1);
+                }
+                .st-ai-res-block {
+                    background: #ffffff;
+                    border-radius: 16px;
+                    padding: 16px;
+                    margin-bottom: 14px;
+                    border: 0.5px solid rgba(0,0,0,0.06);
+                    box-shadow: 0 4px 16px rgba(0,0,0,0.02);
+                }
+                .st-ai-res-label {
+                    font-size: 12px;
+                    font-weight: 700;
+                    color: #262626;
+                    letter-spacing: 0.5px;
+                    margin-bottom: 8px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                }
+                .st-ai-res-label span.badge {
+                    font-size: 10px;
+                    font-weight: 500;
+                    color: #576b95;
+                    background: rgba(87, 107, 149, 0.1);
+                    padding: 2px 8px;
+                    border-radius: 10px;
+                }
+                .st-ai-preview-stage {
+                    margin-top: 10px;
+                    padding: 14px;
+                    border-radius: 12px;
+                    background: #fafafa;
+                    border: 1px dashed #e5e5ea;
+                    overflow: hidden;
+                }
+            </style>
+
             <!-- 吸顶背景包裹层 (与面具APP保持一致) -->
-            <div style="flex-shrink: 0; background: #fafafa; z-index: 100;">
+            <div style="flex-shrink: 0; background: #fafafa; z-index: 100; position: relative;">
                 <div class="elegant-header" style="position: static; padding-bottom: 5px;">
                     <div class="ins-back-btn" onclick="AppNav.goHome()" style="flex: 1; justify-content: flex-start; cursor: pointer; color: #262626;">
                         <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
@@ -40803,8 +40948,19 @@ ${chronologicalContext || '日常生活状态。'}
                         <div class="eh-title" style="letter-spacing: 4px; font-weight: 700;">STORY</div>
                         <div class="eh-subtitle" style="letter-spacing: 1.5px; white-space: nowrap;">INTERACTIVE NARRATIVE</div>
                     </div>
-                    <div class="ins-back-btn right" onclick="window.StoryApp.openCreateModal()" style="flex: 1;">
+                    <div class="ins-back-btn right" onclick="window.StoryApp.toggleAddStoryMenu(event)" style="flex: 1;">
                         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    </div>
+                </div>
+                <!-- 右上角加号悬浮小弹窗 -->
+                <div id="st-add-story-menu" class="st-add-menu-pop" onclick="event.stopPropagation()">
+                    <div class="st-add-menu-item" onclick="window.StoryApp.closeAddStoryMenu(); window.StoryApp.openCreateModal();">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                        <span>手动创建剧本</span>
+                    </div>
+                    <div class="st-add-menu-item" onclick="window.StoryApp.closeAddStoryMenu(); window.StoryApp.openAICreateModal();">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"></path><path d="M19 3v4"></path><path d="M21 5h-4"></path></svg>
+                        <span>AI 生成剧本</span>
                     </div>
                 </div>
                 <div class="eh-divider" style="margin: 0;">
@@ -40818,6 +40974,1001 @@ ${chronologicalContext || '日常生活状态。'}
                 <!-- 故事竖卡将在此渲染 -->
             </div>
         </div>
+
+        <!-- 弹窗: AI 生成剧本高定全屏工坊 -->
+        <div id="modal-story-ai-create" class="ins-modal" style="background:#fafafa; z-index: 260;">
+            <div class="ins-header story-header-divider" style="background:rgba(250,250,250,0.92);">
+                <div class="ins-back-btn" onclick="closeModal('modal-story-ai-create')">取消</div>
+                <div class="ins-header-title" style="display:flex; flex-direction:column; align-items:center; line-height:1.1;">
+                    <span style="font-size:15px; font-weight:700; letter-spacing:1px;">AI 剧本工坊</span>
+                    <span style="font-size:9px; color:#a3a3a3; letter-spacing:2px; margin-top:2px;">GENESIS STUDIO</span>
+                </div>
+                <div class="ins-back-btn right" style="pointer-events:none; opacity:0;">占位</div>
+            </div>
+
+            <div id="st-ai-workshop-scroll" style="height: calc(100% - 50px); overflow-y: auto; padding-bottom: 60px;">
+                <!-- 1. 封面头像与基础信息 -->
+                <div class="story-set-section">剧本视觉与人称设定</div>
+                <div class="story-set-card" style="padding: 16px; display: flex; flex-direction: column; gap: 14px;">
+                    <div style="display: flex; align-items: center; gap: 16px;">
+                        <div onclick="window.StoryApp.triggerAICoverUpload()" style="width: 68px; height: 88px; border-radius: 12px; background: #f2f2f5; border: 1px dashed #d1d5db; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; overflow: hidden; position: relative; background-size: cover; background-position: center;" id="st-ai-cover-box">
+                            <svg id="st-ai-cover-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#8e8e93" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                            <span id="st-ai-cover-txt" style="font-size: 9.5px; color: #8e8e93; margin-top: 4px;">上传封面</span>
+                        </div>
+                        <div style="flex: 1; display: flex; flex-direction: column; gap: 6px;">
+                            <div style="font-size: 12px; font-weight: 600; color: #262626;">预设剧本名称 <span style="font-size:10.5px; color:#8e8e93; font-weight:normal;">(勾选生成名称时可留空)</span></div>
+                            <textarea id="st-ai-inp-name" class="ins-textarea" rows="1" style="height: 38px; min-height: 38px; margin-top: 0; padding: 9px 12px; font-size: 13.5px; line-height: 20px; border-radius: 10px; background: #f7f7f9; border: 1px solid #efefef; resize: none; overflow: hidden;" placeholder="手填剧本名，或交由 AI 命名..."></textarea>
+                        </div>
+                    </div>
+                    <div style="border-top: 0.5px dashed #efefef; padding-top: 12px; display: flex; flex-direction: column; gap: 10px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 13.5px; color: #333;">
+                            <span style="font-weight: 500;">Char 角色人称</span>
+                            <select id="st-ai-p-char" class="st-designed-select">
+                                <option value="第一人称">第一人称(我)</option>
+                                <option value="第二人称">第二人称(你)</option>
+                                <option value="第三人称" selected>第三人称(他/她)</option>
+                            </select>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 13.5px; color: #333;">
+                            <span style="font-weight: 500;">User 玩家人称</span>
+                            <select id="st-ai-p-user" class="st-designed-select">
+                                <option value="第一人称">第一人称(我)</option>
+                                <option value="第二人称" selected>第二人称(你)</option>
+                                <option value="第三人称">第三人称(他/她)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. 绑定关联设定 -->
+                <div class="story-set-section">绑定参考设定 (AI生成时将深度读取)</div>
+                <div class="story-set-card">
+                    <div class="story-set-item" onclick="window.StoryApp.toggleSetExp('st-ai-exp-char')">
+                        <div class="story-set-main">
+                            <div class="story-set-title"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8e8e8e" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg> 选择拉入的角色</div>
+                            <div class="story-set-val"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
+                        </div>
+                        <div class="story-set-exp" id="st-ai-exp-char" onclick="event.stopPropagation()">
+                            <div class="story-grid-select" id="st-ai-char-selectors" style="padding: 12px 0;"></div>
+                        </div>
+                    </div>
+                    <div class="story-set-item" onclick="window.StoryApp.toggleSetExp('st-ai-exp-wb')">
+                        <div class="story-set-main">
+                            <div class="story-set-title"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8e8e8e" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg> 绑定世界书</div>
+                            <div class="story-set-val"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
+                        </div>
+                        <div class="story-set-exp" id="st-ai-exp-wb" onclick="event.stopPropagation()">
+                            <div id="st-ai-wb-selectors" style="background:#fff; border-radius:8px; padding:0 12px; max-height:180px; overflow-y:auto; border:1px solid #efefef; margin-top:8px;"></div>
+                        </div>
+                    </div>
+                    <div class="story-set-item" style="border:none;" onclick="window.StoryApp.toggleSetExp('st-ai-exp-user')">
+                        <div class="story-set-main">
+                            <div class="story-set-title"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8e8e8e" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg> 绑定 User 面具</div>
+                            <div class="story-set-val"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
+                        </div>
+                        <div class="story-set-exp" id="st-ai-exp-user" onclick="event.stopPropagation()">
+                            <div style="font-size:12px; color:#8e8e8e; margin:8px 0;">选择此剧本专属的 User 面具，AI 将结合面具身份构思剧情：</div>
+                            <div id="st-ai-user-selectors" style="background:#fff; border-radius:8px; padding:0 12px; max-height:180px; overflow-y:auto; border:1px solid #efefef;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. 创作灵感与定制要求输入 -->
+                <div class="story-set-section">灵感与组件定制要求 (可留空交由AI发挥)</div>
+                <div class="story-set-card" style="padding: 16px; display: flex; flex-direction: column; gap: 14px;">
+                    <div>
+                        <div style="font-size: 13px; font-weight: 600; color: #1c1c1e; margin-bottom: 6px; display:flex; align-items:center; gap:6px;">
+                            <span>① 剧本构想与世界观要求</span>
+                        </div>
+                        <textarea id="st-ai-req-world" class="ins-textarea" style="height: 86px; margin-top: 0; font-size: 13px; line-height: 1.5; background: #f7f7f9; border: 1px solid #efefef; resize: vertical;" placeholder="输入你想玩的故事类型、世界观背景、人物关系或特殊玩法效果（如：末世极寒囤货求生、古风悬疑探案、豪门契约婚姻拉扯等）..."></textarea>
+                    </div>
+                    <div style="border-top: 0.5px dashed #efefef; padding-top: 12px;">
+                        <div style="font-size: 13px; font-weight: 600; color: #1c1c1e; margin-bottom: 4px;">② 第一状态栏定制需求</div>
+                        <div style="font-size: 11px; color: #8e8e93; margin-bottom: 6px; line-height: 1.4;">仅定制第1个主状态栏点击展开后的内部内容与高定卡片设计（外层标题与后4个状态栏保持原样不变）。</div>
+                        <textarea id="st-ai-req-status" class="ins-textarea" style="height: 68px; margin-top: 0; font-size: 13px; line-height: 1.5; background: #f7f7f9; border: 1px solid #efefef; resize: vertical;" placeholder="例如：包含【随身物资清单】+【身体状态指标】+【暗中观察者的心声与弹幕】..."></textarea>
+                    </div>
+                </div>
+
+                <!-- 4. 勾选需要同步生成的内容 -->
+                <div class="story-set-section">勾选需要 AI 生成的模块</div>
+                <div class="story-set-card" style="padding: 16px;">
+                    <div class="st-ai-gen-check-grid" id="st-ai-check-matrix">
+                        <div class="st-ai-check-pill active" data-key="name" onclick="this.classList.toggle('active')">
+                            <span class="st-ai-check-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                            <span>剧本名称</span>
+                        </div>
+                        <div class="st-ai-check-pill active" data-key="worldview" onclick="this.classList.toggle('active')">
+                            <span class="st-ai-check-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                            <span>世界观</span>
+                        </div>
+                        <div class="st-ai-check-pill active" data-key="opening" onclick="this.classList.toggle('active')">
+                            <span class="st-ai-check-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                            <span>开场白</span>
+                        </div>
+                        <div class="st-ai-check-pill active" data-key="status" onclick="this.classList.toggle('active')">
+                            <span class="st-ai-check-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                            <span>状态栏</span>
+                        </div>
+                        <div class="st-ai-check-pill active" data-key="chars" onclick="this.classList.toggle('active')">
+                            <span class="st-ai-check-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                            <span>角色和NPC</span>
+                        </div>
+                    </div>
+                    <div style="font-size: 11px; color: #8e8e93; margin-top: 10px; line-height: 1.45;">
+                        * 勾选「角色和NPC」时，将自动生成除已拉入角色以外的全新角色与配角 NPC，并在进入剧本时自动创建一张同名角色卡（若上传了剧本封面将自动同步为该角色卡头像）。
+                    </div>
+                    <!-- 生成前显示的底部主按钮 -->
+                    <div id="st-ai-pre-gen-bar" style="margin-top: 14px;">
+                        <button id="st-ai-main-gen-btn" onclick="window.StoryApp.startAIGenerateStory('')" class="ins-btn" style="width: 100%; margin: 0; border-radius: 12px; background: #262626; display:flex; align-items:center; justify-content:center; gap:6px;">
+                            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"></path></svg>
+                            <span id="st-ai-main-gen-btn-txt">点击生成剧本内容</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 5. 生成完成后的结果预览与精修区 -->
+                <div id="st-ai-result-container" style="display: none; padding: 0 16px; margin-top: 20px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding: 0 4px;">
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <span style="width: 8px; height: 8px; border-radius: 50%; background: #07c160; display: inline-block;"></span>
+                            <span style="font-size: 14px; font-weight: 700; color: #1c1c1e;">生成完毕 · 档案预览与微调</span>
+                        </div>
+                        <span style="font-size: 11px; color: #8e8e93;">框内文字均可直接手动修改</span>
+                    </div>
+
+                    <!-- 生成结果：剧本名称 -->
+                    <div class="st-ai-res-block" id="st-ai-res-wrap-name" style="display:none;">
+                        <div class="st-ai-res-label"><span>剧本名称</span><span class="badge">TITLE</span></div>
+                        <textarea id="st-ai-res-name" class="ins-textarea" rows="1" style="height:38px; min-height:38px; margin-top:0; padding:8px 12px; font-size:14px; font-weight:600; color:#1c1c1e; background:#f9f9fb; border:1px solid #efefef; resize:none;"></textarea>
+                    </div>
+
+                    <!-- 生成结果：世界观 -->
+                    <div class="st-ai-res-block" id="st-ai-res-wrap-worldview" style="display:none;">
+                        <div class="st-ai-res-label"><span>世界观与背景设定</span><span class="badge">WORLDVIEW</span></div>
+                        <textarea id="st-ai-res-worldview" class="ins-textarea" style="height:130px; margin-top:0; font-size:13px; line-height:1.6; color:#333; background:#f9f9fb; border:1px solid #efefef; resize:vertical;"></textarea>
+                    </div>
+
+                    <!-- 生成结果：角色和NPC -->
+                    <div class="st-ai-res-block" id="st-ai-res-wrap-chars" style="display:none;">
+                        <div class="st-ai-res-label"><span>新增角色与 NPC 群像档案 (不含已拉入角色)</span><span class="badge">NEW CHARS & NPCS</span></div>
+                        <textarea id="st-ai-res-chars" class="ins-textarea" style="height:210px; margin-top:0; font-size:12.5px; line-height:1.6; color:#333; background:#f9f9fb; border:1px solid #efefef; resize:vertical;"></textarea>
+                    </div>
+
+                    <!-- 生成结果：开场白 (带默认章节报头信息展示) -->
+                    <div class="st-ai-res-block" id="st-ai-res-wrap-opening" style="display:none;">
+                        <div class="st-ai-res-label"><span>首章开场白正文</span><span class="badge">OPENING</span></div>
+                        <div id="st-ai-preview-chapter-box" class="st-ai-preview-stage" style="margin-bottom: 10px; display:none;"></div>
+                        <textarea id="st-ai-res-opening" class="ins-textarea" style="height:180px; margin-top:0; font-size:13.5px; line-height:1.65; color:#262626; background:#f9f9fb; border:1px solid #efefef; resize:vertical;"></textarea>
+                    </div>
+
+                    <!-- 生成结果：第一状态栏 (实时展开效果预览 + 第一状态栏提示词可调) -->
+                    <div class="st-ai-res-block" id="st-ai-res-wrap-status" style="display:none;">
+                        <div class="st-ai-res-label"><span>第一状态栏展开效果预览</span><span class="badge">FIRST STATUS</span></div>
+                        <div id="st-ai-preview-status-box" class="st-ai-preview-stage"></div>
+                        <div style="font-size:11px; color:#8e8e93; margin:10px 0 4px 0;">第一状态栏生成提示词 (后4个自由状态栏提示词已自动锁死保留)：</div>
+                        <textarea id="st-ai-res-status-prompt" class="ins-textarea" style="height:95px; margin-top:0; font-size:12px; line-height:1.5; color:#555; background:#f9f9fb; border:1px solid #efefef; resize:vertical;"></textarea>
+                    </div>
+
+                    <!-- 生成后显示的底部双图标按钮：左重新生成 / 右进入剧本 -->
+                    <div style="display: flex; gap: 12px; margin-top: 18px; margin-bottom: 24px;">
+                        <button onclick="window.StoryApp.openAIRetryModal()" class="ins-btn outline" style="flex: 1; margin: 0; border-radius: 12px; border: 1px solid #d1d5db; color: #262626; background: #fff; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                            <span>重新生成</span>
+                        </button>
+                        <button onclick="window.StoryApp.confirmAICreateAndEnter()" class="ins-btn" style="flex: 1.4; margin: 0; border-radius: 12px; background: #262626; color: #fff; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+                            <span>进入剧本</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 弹窗：不满意重新生成（输入修改方向与原因） -->
+            <div id="modal-st-ai-retry" class="ins-modal" style="z-index: 320; background: rgba(0,0,0,0.45); display: none; align-items: center; justify-content: center; padding: 20px; position: fixed !important; top: 0; left: 0; width: 100%; height: 100%;">
+                <div style="background: #fff; width: 100%; max-width: 340px; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.22); animation: fadeIn 0.2s ease; display: flex; flex-direction: column;">
+                    <div style="padding: 18px 20px 14px; text-align: center; font-size: 16px; font-weight: 700; color: #1c1c1e; border-bottom: 0.5px solid #f0f0f0;">定向调优重新生成</div>
+                    <div style="padding: 16px 20px;">
+                        <div style="font-size: 12px; color: #8e8e93; margin-bottom: 8px; line-height: 1.5;">请告诉 AI 刚才生成的内容哪里不满意，或希望往什么方向修改（留空则直接换一版新构思）：</div>
+                        <textarea id="st-ai-retry-feedback" class="ins-textarea" style="width: 100%; height: 110px; background: #f9f9fb; border: 1px solid #efefef; padding: 10px 12px; margin-top: 0; border-radius: 10px; font-size: 13px; line-height: 1.5; resize: vertical;" placeholder="例如：开场白冲突感不够强；或者把第一状态栏改成素雅手账风的线索面板；或者调整某个新增角色的性格..."></textarea>
+                    </div>
+                    <div style="display: flex; border-top: 0.5px solid #f0f0f0;">
+                        <div onclick="document.getElementById('modal-st-ai-retry').style.display='none'" style="flex: 1; padding: 15px; text-align: center; font-size: 15px; color: #8e8e93; cursor: pointer; border-right: 0.5px solid #f0f0f0;">取消</div>
+                        <div onclick="window.StoryApp.submitAIRetry()" style="flex: 1; padding: 15px; text-align: center; font-size: 15px; color: #262626; font-weight: 600; cursor: pointer;">立即重写</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            // 挂载 AI 剧本创世工坊扩展方法至 window.StoryApp
+            setTimeout(() => {
+                if (!window.StoryApp) return;
+                Object.assign(window.StoryApp, {
+                    tempAICover: '',
+                    selectedCharsForAI: [],
+                    aiGeneratedCache: null,
+                    isAIGenerating: false,
+
+                    // 固定不变的状态栏外框与后4个自由栏目提示词模板
+                    fixedStatusOtherRulesHeader: `【关于status_modules极其严格的内容生成要求】：\n1. 必须生成且仅生成 5 个独立的 module 模块。对象的 title 标签内必须言简意赅地直接写清内容和归属人，切勿太长。例如：“角色名的状态”、“角色名的日记”，禁止生成带有user名字的状态栏。\n2. `,
+                    fixedStatusOtherRulesFooter: `\n3. 其余的 4 个栏目，可以根据当前剧情从以下类型中挑选或结合当前剧情自主发挥创意：聊天记录、微博更新、日记、备忘录、平行if线(平行世界的当前剧情)、同人文、朋友圈、上帝视角、八卦论坛、内心想法(其他角色或NPC的)、浏览器搜索记录、物品心声、钱包收支变动、购物清单、星座运势、塔罗占卜、网易云歌单等，注意必须根据当前剧情生成，并且禁止局限于提供给你的这些类型。\n4. 【状态栏铁律】：此限制仅针对状态栏有效！状态栏的4个自由栏目必须且只能围绕该焦点角色及NPC展开，在状态栏模块内部，绝对不允许生成属于user({玩家名})的状态记录！\n5. 这4个自由发挥的栏目必须内容丰富且匹配剧情，绝不能注水敷衍！要求例如：聊天记录必须至少5轮来回对话；同人文必须300字以上；朋友圈必须带上点赞和多条精彩评论；观众弹幕至少5条。\n6. 【UI排版要求】：内容文字排版请完全自行设计，保持界面整洁美观，但绝对禁止出现**符号！！对于4个自由栏目，在其 content 的最末尾，只允许生成“唯一一句”点睛之笔吐槽，用 || 包裹结尾（例如：||这个男人表面稳如老狗，内心已经慌了||）。`,
+
+                    toggleAddStoryMenu: function(e) {
+                        if (e) e.stopPropagation();
+                        const menu = document.getElementById('st-add-story-menu');
+                        if (menu) menu.classList.toggle('show');
+                    },
+                    closeAddStoryMenu: function() {
+                        const menu = document.getElementById('st-add-story-menu');
+                        if (menu) menu.classList.remove('show');
+                    },
+
+                    ensureEntityThumbnails: async function() {
+                        let updated = false;
+                        if (Array.isArray(appData.charCards)) {
+                            for (let c of appData.charCards) {
+                                if (c.avatar && !c.avatarThumb) {
+                                    c.avatarThumb = await generateThumbnail(c.avatar, 96);
+                                    updated = true;
+                                }
+                            }
+                        }
+                        if (appData.settings && Array.isArray(appData.settings.userList)) {
+                            for (let u of appData.settings.userList) {
+                                if (u.avatar && !u.avatarThumb) {
+                                    u.avatarThumb = await generateThumbnail(u.avatar, 96);
+                                    updated = true;
+                                }
+                            }
+                        }
+                        if (updated) saveGlobalData();
+                    },
+
+                    renderLazyUserRadioList: function(containerId, selectedId, radioName) {
+                        const ctn = document.getElementById(containerId);
+                        if (!ctn) return;
+                        let html = '';
+                        let actualId = (selectedId && selectedId !== 'default') ? selectedId : (appData.settings.activeUserId || 'u_default');
+                        if (appData.settings && Array.isArray(appData.settings.userList) && appData.settings.userList.length > 0) {
+                            appData.settings.userList.forEach(u => {
+                                let checked = (u.id === actualId) ? 'checked' : '';
+                                let thumbUrl = u.avatarThumb || u.avatar || '';
+                                html += `<label class="wb-check-item" style="padding:10px 0; border-bottom:0.5px dashed #f0f0f0; margin:0; display:flex; align-items:center; gap:10px; cursor:pointer;">
+                                    <input type="radio" name="${radioName}" value="${u.id}" ${checked}>
+                                    <div data-lazy-avatar="${thumbUrl}" style="width:28px;height:28px;border-radius:14px;background-size:cover;background-position:center;background-color:#f5f5f5; flex-shrink:0;"></div>
+                                    <div style="display:flex; flex-direction:column; justify-content:center; overflow:hidden;">
+                                        <span style="font-size:14px; font-weight:500; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;">${u.name}</span>
+                                        <span style="font-size:11px; color:#8e8e8e; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;">身份: ${u.identity || '未填'}</span>
+                                    </div>
+                                </label>`;
+                            });
+                            ctn.innerHTML = html;
+                            window.renderLazyAvatarBatch('#' + containerId, 'data-lazy-avatar', 12, 16);
+                        } else {
+                            ctn.innerHTML = '<div style="font-size:12px; color:#8e8e8e; text-align:center; padding:10px;">使用默认全局 User</div>';
+                        }
+                    },
+
+                    openAICreateModal: function() {
+                        this.initCustomSelects();
+                        this.tempAICover = '';
+                        this.selectedCharsForAI = [];
+                        this.aiGeneratedCache = null;
+
+                        const coverBox = document.getElementById('st-ai-cover-box');
+                        const coverIcon = document.getElementById('st-ai-cover-icon');
+                        const coverTxt = document.getElementById('st-ai-cover-txt');
+                        if (coverBox) coverBox.style.backgroundImage = 'none';
+                        if (coverIcon) coverIcon.style.display = 'block';
+                        if (coverTxt) coverTxt.style.display = 'block';
+
+                        document.getElementById('st-ai-inp-name').value = '';
+                        document.getElementById('st-ai-req-world').value = '';
+                        document.getElementById('st-ai-req-status').value = '';
+
+                        const pCharEl = document.getElementById('st-ai-p-char');
+                        const pUserEl = document.getElementById('st-ai-p-user');
+                        if (pCharEl) pCharEl.value = (appData.settings.storyApp && appData.settings.storyApp.perspectiveChar) || '第三人称';
+                        if (pUserEl) pUserEl.value = (appData.settings.storyApp && appData.settings.storyApp.perspectiveUser) || '第二人称';
+
+                        // 恢复生成前按钮显示，隐藏生成结果区
+                        const preGenBar = document.getElementById('st-ai-pre-gen-bar');
+                        if (preGenBar) preGenBar.style.display = 'block';
+                        const btnTxt = document.getElementById('st-ai-main-gen-btn-txt');
+                        if (btnTxt) btnTxt.innerText = '点击生成剧本内容';
+                        document.getElementById('st-ai-result-container').style.display = 'none';
+
+                        // 默认全选5个生成项
+                        document.querySelectorAll('#st-ai-check-matrix .st-ai-check-pill').forEach(el => el.classList.add('active'));
+
+                        // 渲染角色选择器
+                        const charCtn = document.getElementById('st-ai-char-selectors');
+                        if (!appData.charCards || !appData.charCards.length) {
+                            charCtn.innerHTML = '<div style="grid-column: span 4; font-size:12px; color:#8e8e8e; text-align:center;">尚未创建角色（可勾选下方由AI生成角色）</div>';
+                        } else {
+                            let sortedChars = [...appData.charCards].sort((a, b) => {
+                                if (!a.isNPC && b.isNPC) return -1;
+                                if (a.isNPC && !b.isNPC) return 1;
+                                if (a.isNPC && b.isNPC) return parseInt(b.id.replace(/\D/g, '') || 0) - parseInt(a.id.replace(/\D/g, '') || 0);
+                                return 0;
+                            });
+                            let charHtml = '';
+                            sortedChars.forEach(c => {
+                                const thumbUrl = c.avatarThumb || c.avatar || '';
+                                const npcText = c.isNPC ? '<span style="color:#07c160; font-size:9.5px;">(NPC)</span>' : '';
+                                charHtml += `
+                                    <div class="story-char-sel-item" id="sel-char-ai-${c.id}" onclick="window.StoryApp.toggleCharSelectAI('${c.id}')">
+                                        <div class="grid-avatar" data-lazy-avatar="${thumbUrl}" style="background-color:#f5f5f5;"></div>
+                                        <span class="grid-name">${c.name} ${npcText}</span>
+                                        <div class="story-char-check-badge"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+                                    </div>`;
+                            });
+                            charCtn.innerHTML = charHtml;
+                            window.renderLazyAvatarBatch('#st-ai-char-selectors', 'data-lazy-avatar', 12, 16);
+                        }
+
+                        // 渲染世界书选择器
+                        const wbCtn = document.getElementById('st-ai-wb-selectors');
+                        if (!appData.worldBook || !appData.worldBook.length) {
+                            wbCtn.innerHTML = '<div style="font-size:12px; color:#8e8e8e; text-align:center; padding:10px;">尚未创建世界书</div>';
+                        } else {
+                            wbCtn.innerHTML = appData.worldBook.map(w =>
+                                `<label class="wb-check-item" style="padding:10px 0; border-bottom:0.5px dashed #f0f0f0; margin:0;"><input type="checkbox" class="story-wb-checkbox-ai" value="${w.id}"> <span style="font-size:14px;">${w.name || w.keys}</span></label>`
+                            ).join('');
+                        }
+
+                        // 渲染 User 面具选择器
+                        this.renderLazyUserRadioList('st-ai-user-selectors', 'default', 'story-user-radio-ai');
+
+                        document.getElementById('modal-story-ai-create').style.display = 'block';
+                        this.ensureEntityThumbnails();
+                    },
+
+                    toggleCharSelectAI: function(id) {
+                        const el = document.getElementById('sel-char-ai-' + id);
+                        if (!el) return;
+                        if (this.selectedCharsForAI.includes(id)) {
+                            this.selectedCharsForAI = this.selectedCharsForAI.filter(x => x !== id);
+                            el.classList.remove('selected');
+                        } else {
+                            this.selectedCharsForAI.push(id);
+                            el.classList.add('selected');
+                        }
+                    },
+
+                    triggerAICoverUpload: function() {
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = 'image/*';
+                        input.onchange = (e) => {
+                            const file = e.target.files[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = (evt) => {
+                                this.tempAICover = evt.target.result;
+                                const box = document.getElementById('st-ai-cover-box');
+                                const icon = document.getElementById('st-ai-cover-icon');
+                                const txt = document.getElementById('st-ai-cover-txt');
+                                if (box) box.style.backgroundImage = `url('${this.tempAICover}')`;
+                                if (icon) icon.style.display = 'none';
+                                if (txt) txt.style.display = 'none';
+                            };
+                            reader.readAsDataURL(file);
+                        };
+                        input.click();
+                    },
+
+                    openAIRetryModal: function() {
+                        document.getElementById('st-ai-retry-feedback').value = '';
+                        document.getElementById('modal-st-ai-retry').style.display = 'flex';
+                    },
+
+                    submitAIRetry: function() {
+                        const fb = document.getElementById('st-ai-retry-feedback').value.trim();
+                        document.getElementById('modal-st-ai-retry').style.display = 'none';
+                        this.startAIGenerateStory(fb);
+                    },
+
+                    // 包装第一状态栏自定义渲染函数，确保状态栏标题样式和第2~5个状态栏样式完全不变
+                    buildWrappedStatusJS: function(customFirstRenderBodyCode) {
+                        const fallbackFirstBody = `return window.stNativeStatusEngine.renderSingleModule(m, 0, textSize, entry);`;
+                        let safeCustomBody = (customFirstRenderBodyCode || '').trim();
+                        if (!safeCustomBody) safeCustomBody = fallbackFirstBody;
+
+                        return `({
+    onStream: function(rawText, containerEl, ctx) {
+        var match = rawText.match(/<status_modules>([\\s\\S]*?)(?:<\\/status_modules>|$)/i);
+        if (!match) return;
+        var block = match[1];
+        var moduleRegex = /<module>([\\s\\S]*?)<\\/module>/gi;
+        var matches = [...block.matchAll(moduleRegex)];
+        if (!matches.length) return;
+        containerEl.style.display = 'block';
+        var wrap = containerEl.querySelector('.story-wp-status-wrap') || containerEl;
+        var modules = [];
+        matches.forEach(function(m) {
+            var tM = m[1].match(/<title>([\\s\\S]*?)<\\/title>/i);
+            var cM = m[1].match(/<content>([\\s\\S]*?)<\\/content>/i);
+            if (tM && cM) modules.push({ title: tM[1].trim(), content: cM[1].trim() });
+        });
+        if (modules.length > 0) wrap.innerHTML = this.renderModulesHtml(modules, ctx.textSize);
+    },
+    parse: function(rawReply) {
+        return window.stNativeStatusEngine.parse(rawReply);
+    },
+    render: function(modules, ctx) {
+        if (!modules || !modules.length) return '';
+        return '<div class="story-wp-status-wrap">' + this.renderModulesHtml(modules, ctx.textSize, ctx.entry) + '</div>';
+    },
+    renderModulesHtml: function(modules, textSize, entry) {
+        var self = this;
+        return modules.map(function(m, idx) {
+            return self.renderSingleModule(m, idx, textSize, entry);
+        }).join('');
+    },
+    renderSingleModule: function(m, mIdx, textSize, entry) {
+        if (mIdx !== 0) {
+            return window.stNativeStatusEngine.renderSingleModule(m, mIdx, textSize, entry);
+        }
+        var safeContent = String(m.content || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\\*/g, '');
+        var firstInnerHtml = '';
+        try {
+            firstInnerHtml = (function(safeContent, m, textSize, entry) {
+                ${safeCustomBody}
+            })(safeContent, m, textSize, entry);
+        } catch(err) {
+            console.warn('[自定义第一状态栏渲染回退]:', err);
+            return window.stNativeStatusEngine.renderSingleModule(m, 0, textSize, entry);
+        }
+        if (!firstInnerHtml) {
+            return window.stNativeStatusEngine.renderSingleModule(m, 0, textSize, entry);
+        }
+        return '<div class="story-wp-status-item">' +
+            '<div class="story-wp-status-title" style="font-size:' + textSize + 'px;" onclick="window.StoryApp.toggleStatus(this)">' +
+                '<svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21"></polygon></svg><span>' + String(m.title).replace(/【|】/g, '').replace(/</g, '&lt;') + '</span>' +
+            '</div>' +
+            '<div class="story-wp-status-content" style="font-size:' + (textSize - 1) + 'px; padding:16px 14px;">' + firstInnerHtml + '</div>' +
+        '</div>';
+    },
+    extractMemory: function(modules) {
+        if (!modules || !modules.length) return '';
+        var m0 = modules[0];
+        var title = String(m0.title || '状态').replace(/[\\[\\]【】]/g, '').trim();
+        var content = String(m0.content || '').replace(/\\n+/g, ' ').trim();
+        return content ? ('【' + title + '】: ' + content.substring(0, 180)) : '';
+    }
+})`;
+                    },
+
+                    startAIGenerateStory: async function(retryFeedback = '') {
+                        if (this.isAIGenerating) return this.showToast('正在生成中，请稍候...');
+
+                        let engine = appData.settings.activeEngine || 'api';
+                        let apiConf = appData.settings[engine];
+                        if (!apiConf || !apiConf.url || !apiConf.key) {
+                            engine = engine === 'api' ? 'minimax' : 'api';
+                            apiConf = appData.settings[engine];
+                        }
+                        if (!apiConf || !apiConf.url || !apiConf.key) {
+                            return this.showToast('请先在设置中心配置有效的主 API URL 与 Key');
+                        }
+
+                        const checkedKeys = Array.from(document.querySelectorAll('#st-ai-check-matrix .st-ai-check-pill.active')).map(el => el.getAttribute('data-key'));
+                        if (checkedKeys.length === 0) {
+                            return this.showToast('请至少勾选一项需要生成的内容');
+                        }
+
+                        this.isAIGenerating = true;
+                        const btn = document.getElementById('st-ai-main-gen-btn');
+                        const btnTxt = document.getElementById('st-ai-main-gen-btn-txt');
+                        if (btn) btn.style.opacity = '0.6';
+                        if (btnTxt) btnTxt.innerText = 'AI 正在读取设定与构建剧本...';
+                        this.showToast('正在同步记忆并请求主 API 生成剧本内容...');
+
+                        // 1. 收集人称与绑定的 User 面具
+                        const pChar = document.getElementById('st-ai-p-char') ? document.getElementById('st-ai-p-char').value : '第三人称';
+                        const pUser = document.getElementById('st-ai-p-user') ? document.getElementById('st-ai-p-user').value : '第二人称';
+
+                        const linkedUserRadio = document.querySelector('input[name="story-user-radio-ai"]:checked');
+                        const linkedUserId = linkedUserRadio ? linkedUserRadio.value : 'default';
+                        const effectiveUser = window.UserSys.getEffectiveUser(linkedUserId);
+
+                        // 2. 收集拉入的角色及其记忆
+                        const pulledChars = this.selectedCharsForAI.map(id => (appData.charCards || []).find(c => c.id === id)).filter(Boolean);
+                        const pulledCharNames = pulledChars.map(c => c.name);
+                        let charMemoryBundle = { perCharMap: {}, sharedContextPrompt: '' };
+                        if (this.selectedCharsForAI.length > 0 && window.AIEngine) {
+                            if (window.AIEngine.preloadCharMemoryPartitions) {
+                                await window.AIEngine.preloadCharMemoryPartitions(this.selectedCharsForAI);
+                            }
+                            if (window.AIEngine.buildCharsMemoryBundle) {
+                                charMemoryBundle = window.AIEngine.buildCharsMemoryBundle(this.selectedCharsForAI, {});
+                            }
+                        }
+
+                        // 3. 收集世界书
+                        const pulledWbIds = new Set(Array.from(document.querySelectorAll('.story-wb-checkbox-ai:checked')).map(el => el.value));
+                        pulledChars.forEach(c => {
+                            if (Array.isArray(c.linkedWb)) {
+                                c.linkedWb.forEach(wid => pulledWbIds.add(wid));
+                            }
+                        });
+                        let wbContext = '';
+                        pulledWbIds.forEach(wid => {
+                            const b = (appData.worldBook || []).find(x => x.id === wid);
+                            if (b && b.entries) {
+                                wbContext += `\n《${b.name}》：\n` + b.entries.filter(e => e.enabled !== false).map(e => e.content).join('\n');
+                            }
+                        });
+
+                        const manualName = document.getElementById('st-ai-inp-name').value.trim();
+                        const reqWorld = document.getElementById('st-ai-req-world').value.trim();
+                        const reqStatus = document.getElementById('st-ai-req-status').value.trim();
+
+                        let refInfo = `【参考绑定信息（请严格遵循以下人设、记忆、人称与世界书）】:\n`;
+                        refInfo += `- 叙事人称要求：描写角色(Char)时必须使用【${pChar}】，描写玩家(User/${effectiveUser.name || 'User'})时必须使用【${pUser}】。\n`;
+                        refInfo += `- 玩家(User)面具：姓名「${effectiveUser.name || 'User'}」，完整设定：\n${effectiveUser.persona || '未填'}\n`;
+
+                        if (pulledChars.length > 0) {
+                            refInfo += `\n- 已拉入的现有角色完整档案与过往记忆（已存在角色卡）：\n` + pulledChars.map(c => {
+                                let baseInfo = `  * 【已拉入角色：${c.name}】 身份标签：${c.subtitle || '无'} | 性格标签：${c.tags || '无'} | 类型：${c.isNPC ? '配角NPC' : '核心主角'}\n    详细人设：${c.desc || '暂无'}`;
+                                let memText = (charMemoryBundle.perCharMap && charMemoryBundle.perCharMap[c.id]) ? charMemoryBundle.perCharMap[c.id] : '';
+                                return baseInfo + (memText ? `\n    ${memText.replace(/\n/g, '\n    ')}` : '');
+                            }).join('\n\n') + `\n`;
+                        }
+
+                        if (charMemoryBundle.sharedContextPrompt) {
+                            refInfo += charMemoryBundle.sharedContextPrompt + `\n`;
+                        }
+
+                        if (wbContext) {
+                            refInfo += `\n- 绑定的世界书法则设定：${wbContext}\n`;
+                        }
+                        if (manualName) {
+                            refInfo += `\n- 用户已指定的剧本名：《${manualName}》\n`;
+                        }
+
+                        let userReqs = `【用户输入的创作需求】:\n`;
+                        userReqs += `1. 剧本基础构想/世界观要求：${reqWorld || '未填，请你结合绑定角色的人设、过往记忆与面具自由构思一个极具张力与吸引力的题材世界观'}\n`;
+                        userReqs += `2. 第一状态栏定制要求：${reqStatus || '未填，请根据本剧本的世界观题材，设计契合题材的第一状态栏内部字段与清雅高定卡片'}\n`;
+
+                        if (retryFeedback && this.aiGeneratedCache) {
+                            userReqs += `\n【用户对上一版生成结果的修改意见（最高优先级）】:\n${retryFeedback}\n请基于上一版生成的内容，严格按照此修改意见重新调优生成！\n`;
+                        }
+
+                        const pulledNamesNotice = pulledCharNames.length > 0
+                            ? `【严禁重复铁律】：用户已经拉入了现有角色【${pulledCharNames.join('、')}】！你在 <gen_chars> 中生成的角色和NPC必须是【除 ${pulledCharNames.join('、')} 以外的全新新增角色与全新NPC】，绝对禁止将已拉入的角色写进 <gen_chars> 中或拿现有角色来改编！若已拉入了主角，则此处生成的3名核心角色应为全新的重要角色/对手/同伴，外加5名全新配角NPC。`
+                            : `必须包含 **3个全新核心角色** 和 **5个全新配角NPC**！`;
+
+                        const sysPrompt = `你是顶级的互动小说总编剧兼高定前端视觉设计师。请根据用户的参考设定、人称要求与灵感需求，一次性完成剧本设定、首章开场白以及专属第一状态栏的定制。
+
+【核心规则】：
+1. 本次用户勾选需要生成的模块列表为：[${checkedKeys.join(', ')}]。
+2. 若勾选了 \`name\`（剧本名称）：输出在 <gen_name> 标签内（简洁有文学感，不带书名号）。
+3. 若勾选了 \`worldview\`（世界观）：输出在 <gen_worldview> 标签内（包含核心背景、世界法则、主线矛盾与氛围基调，300~500字）。
+4. 若勾选了 \`chars\`（角色和NPC）：输出在 <gen_chars> 标签内。${pulledNamesNotice}
+   不同人物之间必须用明显的分隔线（如 \`====================\`）和编号区分开。每个人物约 200 字左右，必须严格包含以下8个维度的详细设定：
+   【姓名】、【性别】、【年龄】、【身份】、【外貌】、【性格】、【对故事的作用】、【背景故事】。
+5. 若勾选了 \`opening\`（开场白）：
+   - 必须严格遵循人称要求：描写角色使用【${pChar}】，描写玩家(${effectiveUser.name || 'User'})使用【${pUser}】！
+   - 在 <gen_opening> 标签内输出极具画面感与戏剧张力的首章开场正文（600~1000字，结尾留出互动钩子）。
+   - 同时必须按照系统默认的章节报头规范，在 <gen_chapter_sample> 标签内输出第一章的报头信息（不改变报头样式，仅生成数据）：
+     <chapter_info>
+     <title>十五字以内的吐槽类型的首章标题</title>
+     <comment>一句吐槽类型的章节评语</comment>
+     <date>当前剧情具体年月日与时间，用/分隔(如: 2026/11/20/17:50)</date>
+     <weather>只写极简天气词，1~2个字，如：晴、雨、阴、小雪、微风（严禁写长句或修饰词！）</weather>
+     <location>当前事件发生地点，十个字以内</location>
+     </chapter_info>
+6. 若勾选了 \`status\`（第一状态栏定制）：
+   - **重要限制**：状态栏的外层折叠框与标题栏的 CSS 样式、以及后面4个状态栏的规则完全固定不变！你只需要定制**第1个状态栏**的标题文字（\`<title>\`）、内部全新的内容版块，以及点击第1个状态栏展开后的内部卡片 HTML 渲染逻辑。
+   - **标题与版块必须创新铁律**：
+     * 第1个状态栏的标题文字（\`<title>\`）**不需要固定为“角色名的状态”**！请根据本剧本世界观题材起一个贴合的标题，标题名不要太晦涩（例如：“系统面板”、“契约档案”、“刑侦卷宗面板”等，禁止包含user名字）。
+     * **除非用户在定制要求里明确说明保留原版版块，否则第1个状态栏里面的内容版块必须彻底换新！绝对禁止照搬原有的“[数值]+[心声]+[弹幕]”老三样组合！** 请结合世界观设计 3 个全新的核心版块（例如：随身背包/线索证物栏、特殊体质或因果律进度、契约条款/悬赏任务、周围潜伏危机、角色隐秘考量等）。
+   - **原版第一状态栏展开后的视觉设计源码参考与日夜模式强制适配规范**：
+     本系统目前已有的第一状态栏展开后的 HTML 设计风格如下（请你严格参考这种极简杂志留白、高级毛玻璃、精致细边框、SVG小图标配小标题的视觉语言，绝不要有AI味或赛博朋克机械味）：
+     * 【原版风格参考代码片段】：
+       - 外层总容器：\`<div style="display:flex; flex-direction:column; gap:12px;">...</div>\`
+       - 样式A（指标/进度小卡片，必须带 \`border-radius:10px\` 以触发系统日夜模式自动换肤）：
+         \`<div style="display:flex; flex-direction:column; padding:6px 12px; background:rgba(128,128,128,0.05); border-radius:10px; border:1px solid rgba(128,128,128,0.06);"><div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:4px;"><span style="font-size:11px; font-weight:500; opacity:0.9;">指标名</span><span style="font-size:11px; font-family:'Times New Roman', serif; opacity:0.8;">数值或状态</span></div><div style="width:100%; height:4px; background:rgba(128,128,128,0.15); border-radius:2px; overflow:hidden;"><div style="width:75%; height:100%; background:#62d3df; border-radius:2px;"></div></div><div style="text-align:right; font-size:10px; opacity:0.55; margin-top:5px;">简短批注</div></div>\`
+       - 样式B（带SVG图标的小标题 + 引用/描述块，必须带 \`border-radius:12px\` 以触发系统日夜模式自动换肤）：
+         \`<div><div style="font-size:11px; opacity:0.6; margin-bottom:6px; display:flex; align-items:center; gap:4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">...</svg> 版块标题</div><div style="background:rgba(128,128,128,0.04); border:1px solid rgba(128,128,128,0.08); padding:12px; border-radius:12px; font-size:12px; opacity:0.9;">版块内容...</div></div>\`
+       - 样式C（条目列表/网格清单项，必须带 \`border-radius:8px\` 以触发系统日夜模式自动换肤，强调词可用 \`color:#576b95;\` 夜间会自动变为柔和亮蓝 \`#7a99d8\`）：
+         \`<div style="padding:6px 10px; background:rgba(128,128,128,0.06); border-radius:8px; font-size:12px; opacity:0.9; display:flex; justify-content:space-between; gap:8px;"><span style="color:#576b95; font-weight:500; flex-shrink:0;">条目名</span><span style="word-break:break-all;">详情描述</span></div>\`
+     * **【日夜切换自动对应铁律】**：
+       1. 展开框内的所有文字**严禁写死深色（如 \`color:#333\` 或 \`#000\`）或纯白背景（\`background:#fff\`）**！必须继承父级文字颜色并搭配 \`opacity:0.6\` ~ \`0.95\` 控制层次，或使用 \`color:#576b95\` 作为高亮色（系统已内置夜间模式自动将其转为 \`#7a99d8\`）。
+       2. 内部小卡片的圆角必须严格使用 \`border-radius:10px\`、\`border-radius:12px\` 或 \`border-radius:8px\`（无空格），进度条轨道高度固定写 \`height:4px\`，因为本系统的日间与夜间模式 CSS 选择器正是精准绑定这几个属性来自动切换日夜底色与边框亮度的！
+   - 在 <gen_status_first_prompt> 中**只输出第 2 条规则文本**（即针对第 1 个栏目的全新标题与全新版块格式要求），写法格式示例：
+     \`第 1 个栏目的 title 必须为“XXXX”（契合剧情的专属面板标题，禁止包含user名字），且 content 标签内部必须强制包含以下全新内容版块要求：\\n[版块1名称]: 具体生成格式要求...\\n[版块2名称]: 具体生成格式要求...\\n[版块3名称]: 具体生成格式要求...\`
+   - 在 <gen_status_first_js_body> 中输出一段纯 JS 函数体代码（供 \`function(safeContent, m, textSize, entry)\` 执行并 \`return\` 拼接好的内部 HTML 字符串），负责解析 \`safeContent\` 中你定义的各个新版块，并严格按照上述【原版风格参考代码片段与日夜切换铁律】渲染为极具设计感的卡片 HTML（只 return 展开框内部的 HTML，不要包含外层的 \`.story-wp-status-item\` 和标题栏）。
+   - 在 <gen_status_sample> 中**只输出第 1 个状态栏模块的 XML 数据**（不需要输出后面4个状态栏），格式严格为：
+     <status_modules><module><title>你设计的第1状态栏标题</title><content>匹配你上述新版块规则的首章实际状态内容</content></module></status_modules>
+
+【强制输出规范】：
+请直接输出对应的 XML 标签，标签外部不要有任何寒暄，标签内部不要套 \`\`\` 代码块符号！`;
+
+                        try {
+                            let fetchUrl = apiConf.url.endsWith('/chat/completions') ? apiConf.url : apiConf.url.replace(/\/$/, '') + '/chat/completions';
+                            const res = await fetch(fetchUrl, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiConf.key}` },
+                                body: JSON.stringify({
+                                    model: apiConf.model || 'gpt-4o',
+                                    messages: [
+                                        { role: 'system', content: sysPrompt },
+                                        { role: 'user', content: refInfo + '\n' + userReqs }
+                                    ],
+                                    temperature: 0.75
+                                })
+                            });
+
+                            if (!res.ok) {
+                                const errTxt = await res.text();
+                                throw new Error(`HTTP ${res.status}: ${errTxt}`);
+                            }
+
+                            const data = await res.json();
+                            const raw = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
+                            if (!raw.trim()) throw new Error('API 返回内容为空');
+
+                            const extractTag = (tag) => {
+                                const reg = new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`, 'i');
+                                const m = raw.match(reg);
+                                if (!m) return '';
+                                return m[1].replace(/^```[a-zA-Z]*\s*/i, '').replace(/\s*```$/i, '').trim();
+                            };
+
+                            if (!this.aiGeneratedCache) this.aiGeneratedCache = {};
+                            const cache = this.aiGeneratedCache;
+
+                            cache.pChar = pChar;
+                            cache.pUser = pUser;
+
+                            if (checkedKeys.includes('name')) {
+                                cache.name = extractTag('gen_name') || manualName || '未命名剧本';
+                            } else {
+                                cache.name = manualName || '未命名剧本';
+                            }
+                            if (checkedKeys.includes('worldview')) cache.worldview = extractTag('gen_worldview');
+                            if (checkedKeys.includes('chars')) cache.charsText = extractTag('gen_chars');
+                            if (checkedKeys.includes('opening')) {
+                                cache.opening = extractTag('gen_opening');
+                                cache.chapterSampleRaw = extractTag('gen_chapter_sample');
+                            }
+
+                            if (checkedKeys.includes('status')) {
+                                cache.statusFirstRule = extractTag('gen_status_first_prompt');
+                                cache.statusFirstJSBody = extractTag('gen_status_first_js_body');
+                                cache.statusSampleRaw = extractTag('gen_status_sample');
+                            }
+
+                            cache.checkedKeys = checkedKeys;
+                            this.renderAIGeneratedResults();
+                            this.showToast('AI 剧本生成完成！');
+
+                            setTimeout(() => {
+                                const resBox = document.getElementById('st-ai-result-container');
+                                if (resBox) resBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }, 120);
+
+                        } catch (err) {
+                            console.error('[AI生成剧本异常]:', err);
+                            this.showToast('生成失败: ' + err.message);
+                        } finally {
+                            this.isAIGenerating = false;
+                            if (btn) btn.style.opacity = '1';
+                            if (btnTxt) btnTxt.innerText = '点击生成剧本内容';
+                        }
+                    },
+
+                    getSafeValidatedRunner: function(jsCodeStr, fallbackNativeRunner, requiredMethods) {
+                        if (!jsCodeStr || !jsCodeStr.trim()) return { valid: false, runner: fallbackNativeRunner, code: '' };
+                        try {
+                            let cleanCode = jsCodeStr.trim();
+                            if (!cleanCode.startsWith('(') && cleanCode.startsWith('{')) {
+                                cleanCode = '(' + cleanCode + ')';
+                            }
+                            const fn = new Function('return ' + cleanCode);
+                            const obj = fn();
+                            if (!obj || typeof obj !== 'object') throw new Error('Not an object');
+                            for (let m of requiredMethods) {
+                                if (typeof obj[m] !== 'function') throw new Error('Missing method: ' + m);
+                            }
+                            return { valid: true, runner: obj, code: cleanCode };
+                        } catch (e) {
+                            console.warn('[AI定制组件JS沙盒校验未通过，已回退安全引擎]:', e);
+                            return { valid: false, runner: fallbackNativeRunner, code: '' };
+                        }
+                    },
+
+                    renderAIGeneratedResults: function() {
+                        const cache = this.aiGeneratedCache;
+                        if (!cache) return;
+                        const keys = cache.checkedKeys || [];
+
+                        // 隐藏生成前的单按钮栏，显示生成结果与底部双图标栏
+                        const preGenBar = document.getElementById('st-ai-pre-gen-bar');
+                        if (preGenBar) preGenBar.style.display = 'none';
+                        document.getElementById('st-ai-result-container').style.display = 'block';
+
+                        // 1. 名称
+                        const wrapName = document.getElementById('st-ai-res-wrap-name');
+                        if (keys.includes('name') || cache.name) {
+                            wrapName.style.display = 'block';
+                            document.getElementById('st-ai-res-name').value = cache.name || '';
+                            document.getElementById('st-ai-inp-name').value = cache.name || '';
+                        } else {
+                            wrapName.style.display = 'none';
+                        }
+
+                        // 2. 世界观
+                        const wrapWorld = document.getElementById('st-ai-res-wrap-worldview');
+                        if (keys.includes('worldview')) {
+                            wrapWorld.style.display = 'block';
+                            document.getElementById('st-ai-res-worldview').value = cache.worldview || '';
+                        } else {
+                            wrapWorld.style.display = 'none';
+                        }
+
+                        // 3. 角色和NPC
+                        const wrapChars = document.getElementById('st-ai-res-wrap-chars');
+                        if (keys.includes('chars')) {
+                            wrapChars.style.display = 'block';
+                            document.getElementById('st-ai-res-chars').value = cache.charsText || '';
+                        } else {
+                            wrapChars.style.display = 'none';
+                        }
+
+                        // 4. 开场白与默认章节报头
+                        const wrapOpening = document.getElementById('st-ai-res-wrap-opening');
+                        const chapStage = document.getElementById('st-ai-preview-chapter-box');
+                        if (keys.includes('opening')) {
+                            wrapOpening.style.display = 'block';
+                            document.getElementById('st-ai-res-opening').value = cache.opening || '';
+
+                            let sampleRaw = cache.chapterSampleRaw || '';
+                            if (sampleRaw && !sampleRaw.includes('<chapter_info>')) {
+                                sampleRaw = `<chapter_info>${sampleRaw}</chapter_info>`;
+                            }
+                            let parsedChap = window.stNativeChapterEngine.parse(sampleRaw).data || {
+                                title: cache.name || '序幕开启',
+                                comment: '故事自此拉开帷幕...',
+                                date: '2026/09/20/08:00',
+                                weather: '晴',
+                                location: '初始之地'
+                            };
+                            cache.parsedChapterInfo = parsedChap;
+
+                            if (chapStage) {
+                                chapStage.style.display = 'block';
+                                chapStage.innerHTML = window.stNativeChapterEngine.render(parsedChap, {
+                                    idx: 0,
+                                    floor: 1,
+                                    wordCount: (cache.opening || '').length || 800,
+                                    timeTaken: '1.2',
+                                    defaultTitle: cache.name || '第一章'
+                                });
+                            }
+                        } else {
+                            wrapOpening.style.display = 'none';
+                            if (chapStage) chapStage.style.display = 'none';
+                        }
+
+                        // 5. 第一状态栏预览（仅展示第1个状态栏展开后的效果，外框与后4个状态栏样式不变）
+                        const wrapStatus = document.getElementById('st-ai-res-wrap-status');
+                        if (keys.includes('status')) {
+                            wrapStatus.style.display = 'block';
+                            const defaultFirstRule = `第 1 个栏目的 title 必须固定为“角色名的状态”（如果剧情中有多个角色，请根据此时的剧情侧重点动态、随机选择其中一位角色的名字，绝对不能把多个人名拼在一起），且 content 标签内部必须强制包含以下内容要求：\n[数值]: 具体属性数值（选择2项，如好感度、心动值、吃醋值等，数值范围0-100根据剧情生成，格式为“数值名: 数字 (评价)”，如“心动值: 85 (这个木头终于开窍了)”）如果有多个属性请用 | 隔开。\n[心声]: 30字以上，当前内心真实的吐槽或隐秘的想法\n[弹幕]: 网名1: 弹幕内容 | 网名2: 弹幕内容 (随机取几个网名，至少5条，必须用竖线 | 隔开！)`;
+                            document.getElementById('st-ai-res-status-prompt').value = cache.statusFirstRule || defaultFirstRule;
+
+                            const wrappedJS = this.buildWrappedStatusJS(cache.statusFirstJSBody);
+                            const statCheck = this.getSafeValidatedRunner(wrappedJS, window.stNativeStatusEngine, ['parse', 'render']);
+                            cache.statusJS = statCheck.valid ? statCheck.code : window.stDefaultStatusJS;
+
+                            let sampleStatRaw = cache.statusSampleRaw || '';
+                            if (sampleStatRaw && !sampleStatRaw.includes('<status_modules>')) {
+                                sampleStatRaw = `<status_modules>${sampleStatRaw}</status_modules>`;
+                            }
+                            let parsedMods = window.stNativeStatusEngine.parse(sampleStatRaw).data || [];
+                            if (parsedMods.length > 1) {
+                                parsedMods = [parsedMods[0]];
+                            }
+                            cache.parsedStatusModules = parsedMods;
+
+                            let previewStatHtml = '';
+                            try {
+                                previewStatHtml = statCheck.runner.render(parsedMods, { textSize: 14, entry: { ts: Date.now() } });
+                            } catch (e) {
+                                previewStatHtml = window.stNativeStatusEngine.render(parsedMods, { textSize: 14, entry: { ts: Date.now() } });
+                            }
+                            const statStage = document.getElementById('st-ai-preview-status-box');
+                            statStage.innerHTML = previewStatHtml;
+                            const firstItem = statStage.querySelector('.story-wp-status-item');
+                            if (firstItem) firstItem.classList.add('open');
+                        } else {
+                            wrapStatus.style.display = 'none';
+                        }
+                    },
+
+                    confirmAICreateAndEnter: async function() {
+                        const cache = this.aiGeneratedCache;
+                        if (!cache) return this.showToast('请先生成剧本内容');
+                        const keys = cache.checkedKeys || [];
+
+                        const finalName = (document.getElementById('st-ai-res-name')?.value.trim()) || (document.getElementById('st-ai-inp-name')?.value.trim()) || '未命名剧本';
+                        const finalWorldview = keys.includes('worldview') ? (document.getElementById('st-ai-res-worldview')?.value.trim() || '') : (document.getElementById('st-ai-req-world')?.value.trim() || '');
+                        const finalOpening = keys.includes('opening') ? (document.getElementById('st-ai-res-opening')?.value.trim() || '') : '';
+                        const finalCharsText = keys.includes('chars') ? (document.getElementById('st-ai-res-chars')?.value.trim() || '') : '';
+
+                        const pChar = document.getElementById('st-ai-p-char') ? document.getElementById('st-ai-p-char').value : (cache.pChar || '第三人称');
+                        const pUser = document.getElementById('st-ai-p-user') ? document.getElementById('st-ai-p-user').value : (cache.pUser || '第二人称');
+
+                        let coverThumb = '';
+                        if (this.tempAICover) {
+                            coverThumb = await generateThumbnail(this.tempAICover, 96);
+                        }
+
+                        const finalCharIds = [...this.selectedCharsForAI];
+                        const newStoryId = 'story_' + Date.now();
+
+                        // 如果勾选并生成了【角色和NPC】，自动创建同名角色卡；若上传了剧本头像则同步给该角色卡
+                        if (keys.includes('chars') && finalCharsText) {
+                            const newCharId = 'char_ai_' + Date.now();
+                            const newCharCard = {
+                                id: newCharId,
+                                name: finalName,
+                                subtitle: '剧本群像档案',
+                                color: 'grey',
+                                tags: '角色与NPC',
+                                desc: finalCharsText,
+                                group: '',
+                                isNPC: false,
+                                linkedUser: 'default',
+                                linkedWb: [],
+                                avatar: this.tempAICover || '',
+                                avatarThumb: coverThumb || this.tempAICover || '',
+                                summaries: [],
+                                otherMemories: [],
+                                memoryLink: { linkStory: true, linkedStoryId: newStoryId, storyContextCount: 10, linkChat: false, linkedChatIds: [], chatContextCount: 20 }
+                            };
+                            if (!appData.charCards) appData.charCards = [];
+                            appData.charCards.unshift(newCharCard);
+                            finalCharIds.unshift(newCharId);
+                            if (window.CharCardApp && typeof window.CharCardApp.render === 'function') {
+                                window.CharCardApp.render();
+                            }
+                        }
+
+                        const linkedUserRadio = document.querySelector('input[name="story-user-radio-ai"]:checked');
+                        const linkedUser = linkedUserRadio ? linkedUserRadio.value : 'default';
+                        const selectedBooks = Array.from(document.querySelectorAll('.story-wb-checkbox-ai:checked')).map(el => el.value);
+
+                        // 组合状态栏提示词：仅替换第2条（第一状态栏规则），其余规则（第1、3、4、5、6条）严格保持原样不变
+                        let finalStatusPrompt = window.stDefaultStatusPrompt;
+                        if (keys.includes('status')) {
+                            const editedFirstRule = document.getElementById('st-ai-res-status-prompt')?.value.trim();
+                            if (editedFirstRule) {
+                                const cleanedFirstRule = editedFirstRule.replace(/^2\.\s*/, '');
+                                finalStatusPrompt = this.fixedStatusOtherRulesHeader + cleanedFirstRule + this.fixedStatusOtherRulesFooter;
+                            }
+                        }
+                        const finalStatusJS = (keys.includes('status') && cache.statusJS) ? cache.statusJS : window.stDefaultStatusJS;
+
+                        // 构建首章历史记录（开场白 + 默认章节报头 + 仅第1个状态栏）
+                        const initialHistory = [];
+                        if (finalOpening || keys.includes('status')) {
+                            const openBody = finalOpening || `欢迎来到《${finalName}》的世界。`;
+                            const firstOnlyModules = (keys.includes('status') && cache.parsedStatusModules && cache.parsedStatusModules.length > 0)
+                                ? [cache.parsedStatusModules[0]]
+                                : undefined;
+                            const firstSwipe = {
+                                body: openBody,
+                                chapterInfo: cache.parsedChapterInfo || { title: finalName, comment: '序幕拉开', date: '2026/09/20/08:00', weather: '晴', location: '起始之地' },
+                                status_modules: firstOnlyModules
+                            };
+                            initialHistory.push({
+                                v: 2,
+                                isUser: false,
+                                ts: Date.now(),
+                                body: openBody,
+                                chapterInfo: firstSwipe.chapterInfo,
+                                status_modules: firstSwipe.status_modules,
+                                swipes: [firstSwipe],
+                                swipeIdx: 0,
+                                isOpening: true,
+                                timeTaken: '1.5'
+                            });
+                        }
+
+                        const newStory = {
+                            id: newStoryId,
+                            ts: Date.now(),
+                            name: finalName,
+                            cover: this.tempAICover || '',
+                            coverThumb: coverThumb || this.tempAICover || '',
+                            opening: finalOpening,
+                            openings: finalOpening ? [finalOpening] : [],
+                            worldview: finalWorldview,
+                            chars: finalCharIds,
+                            linkedUser: linkedUser,
+                            books: selectedBooks,
+                            history: initialHistory,
+                            summaries: [],
+                            signatures: {},
+                            musicTracks: [],
+                            musicPlayMode: 'order',
+                            musicShowLyric: true,
+                            settings: {
+                                minWords: 500,
+                                maxWords: 1000,
+                                bracket: '（）',
+                                perspectiveChar: pChar,
+                                perspectiveUser: pUser,
+                                timeAwareness: false,
+                                tzUser: 'Asia/Shanghai',
+                                tzChar: 'Asia/Shanghai',
+                                styleMode: '白描',
+                                styles: JSON.parse(JSON.stringify(stDefaultStyles)),
+                                basePrompt: window.stDefaultBasePrompt,
+                                historyCount: 50,
+                                linkChat: false,
+                                linkChatCount: 10,
+                                linkChatIds: [],
+                                summaryRounds: 20,
+                                summaryPrompt: appData.settings.storyApp?.summaryPrompt || '',
+                                grandSummaryPrompt: appData.settings.storyApp?.grandSummaryPrompt || '',
+                                bg: '',
+                                textSize: 14,
+                                lineHeight: 1.6,
+                                fontFamily: 'serif',
+                                stealTalk: false,
+                                bannedWords: window.stDefaultBannedWords,
+                                regexRemoveWords: window.stDefaultRegexRemoveWords,
+                                cotEnabled: true,
+                                cotPrompt: window.stDefaultCotPrompt,
+                                chapterEn: true,
+                                chapterPrompt: window.stDefaultChapterPrompt,
+                                chapterCSS: window.stDefaultChapterCSS,
+                                chapterJS: window.stDefaultChapterJS,
+                                statusEn: true,
+                                statusPromptFull: finalStatusPrompt,
+                                statusCSS: window.stDefaultStatusCSS,
+                                statusJS: finalStatusJS,
+                                choicesEn: false,
+                                imageGenEnabled: false,
+                                onlinePhone: {
+                                    enabled: false,
+                                    storyTextEnabled: true,
+                                    bilingualText: false,
+                                    lang: 'Japanese',
+                                    stickerEnabled: false,
+                                    bg: '',
+                                    bubbleCSS: window.stDefaultPhoneBubbleCSS
+                                }
+                            }
+                        };
+
+                        appData.stories.unshift(newStory);
+                        saveGlobalData();
+                        if (typeof saveStoryData === 'function') saveStoryData();
+
+                        closeModal('modal-story-ai-create');
+                        this.renderList();
+                        this.openStory(newStory.id);
+                    }
+                });
+
+                // 点击全局任意空白处自动收起右上角加号菜单
+                document.addEventListener('click', (e) => {
+                    const menu = document.getElementById('st-add-story-menu');
+                    if (menu && menu.classList.contains('show')) {
+                        if (!e.target.closest('#st-add-story-menu') && !e.target.closest('[onclick*="toggleAddStoryMenu"]')) {
+                            menu.classList.remove('show');
+                        }
+                    }
+                });
+            }, 200);
+        </script>
 
         <!-- 弹窗: 构建新故事 -->
         <div id="modal-story-create" class="ins-modal" style="background:#fafafa;">
