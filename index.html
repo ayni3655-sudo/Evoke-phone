@@ -41899,7 +41899,7 @@ ${chronologicalContext || '日常生活状态。'}
                             musicPlayMode: 'order',
                             musicShowLyric: true,
                             settings: {
-                                minWords: 500,
+                                minWords: 600,
                                 maxWords: 1000,
                                 bracket: '（）',
                                 perspectiveChar: pChar,
@@ -43405,18 +43405,40 @@ ${chronologicalContext || '日常生活状态。'}
             // 剧本系统数据初始化
             if (!appData.stories) appData.stories =[];
             if (!appData.storyPresets) appData.storyPresets = [];
-            // 全局预设架构库初始化 (加入 localStorage 防丢失双重保底)
+            // 全局预设架构库初始化 (加入 settings + localStorage 三重防丢失机制与时间戳校准)
             if (!appData.tavernPresets) appData.tavernPresets = [];
+            const settingsTavern = (appData.settings && Array.isArray(appData.settings.tavernPresets)) ? appData.settings.tavernPresets : [];
+            const settingsTs = (appData.settings && appData.settings.tavernPresetsUpdatedAt) ? Number(appData.settings.tavernPresetsUpdatedAt) : 0;
 
+            let parsedLocal = [];
+            let localTs = 0;
             try {
                 let localSavedTavern = localStorage.getItem('app_tavern_presets_backup');
+                localTs = Number(localStorage.getItem('app_tavern_presets_ts') || 0);
                 if (localSavedTavern) {
-                    let parsedTavern = JSON.parse(localSavedTavern);
-                    if (Array.isArray(parsedTavern) && parsedTavern.length > 0) {
-                        appData.tavernPresets = parsedTavern;
+                    let tmpParsed = JSON.parse(localSavedTavern);
+                    if (Array.isArray(tmpParsed) && tmpParsed.length > 0) {
+                        parsedLocal = tmpParsed;
                     }
                 }
             } catch(err) {}
+
+            if (settingsTs > 0 || localTs > 0) {
+                if (localTs > settingsTs && parsedLocal.length > 0) {
+                    appData.tavernPresets = parsedLocal;
+                } else if (settingsTavern.length > 0) {
+                    appData.tavernPresets = settingsTavern;
+                } else if (parsedLocal.length > 0) {
+                    appData.tavernPresets = parsedLocal;
+                }
+            } else {
+                if (settingsTavern.length > appData.tavernPresets.length) {
+                    appData.tavernPresets = settingsTavern;
+                }
+                if (parsedLocal.length > appData.tavernPresets.length) {
+                    appData.tavernPresets = parsedLocal;
+                }
+            }
 
             // 默认预设将在下方核心提示词常量定义完成后按原版完整顺序初始化
 
@@ -43470,15 +43492,15 @@ ${chronologicalContext || '日常生活状态。'}
             };
 
             // 全局默认提示词与禁词配置（修改此处的单一来源即可全局生效）
-            window.stDefaultBannedWords = "一丝, 身体很诚实，揉进骨血，那，这，呦，呦呵，老子，低吼，极其，胸腔震动，胸膛震动，碎发拨到耳后，心湖，涟漪，小妖精，稀世珍宝，捏/抬下巴，指节泛白，小兽，宠溺，邪魅一笑，不容置喙";
+            window.stDefaultBannedWords = "一丝,身体很诚实,揉进骨血,呦,呦呵,老子,低吼,极其,胸腔震动,胸膛震动,碎发拨到耳后,心湖,涟漪,小妖精,稀世珍宝,捏/抬下巴,捏/抬下颌,指节泛白,指节泛白,小兽,宠溺,邪魅一笑,不容置喙,舌尖抵腮帮子,戏谑,像是一根针,细针,像是,就像,叫我的名字,再说一遍,再叫一遍";
             window.stDefaultRegexRemoveWords = "极其, 一丝";
 
             // 全局默认：章节报头提示词
             window.stDefaultChapterPrompt = `[章节信息模块]
 请在思考过程之后、正文之前，必须使用 <chapter_info> 和 </chapter_info> 标签包裹本次剧情的章节信息，严格使用如下内部XML标签嵌套格式：
 <chapter_info>
-<title>生成十五字以内的章节标题</title>
-<comment>生成一句章节评语(类似书籍旁白)</comment>
+<title>生成十五字以内吐槽类型的章节标题</title>
+<comment>生成一句吐槽类型的章节评语(类似书籍旁白)</comment>
 <date>推演当前剧情所处的具体年月日和时间，使用/分隔(如: 2026/9/20/17:50)</date>
 <weather>当前天气</weather>
 <location>当前事件发生的地点，十个字以内</location>
@@ -44509,7 +44531,7 @@ ${chronologicalContext || '日常生活状态。'}
 .night-mode .story-wp-choices-list { background: transparent !important; border-color: transparent !important; color: #ddd !important; }
 .night-mode .story-wp-btn { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.1); color: #ddd; }`;
             window.stDefaultBasePrompt = '<role>\n你是一个顶级的沉浸式互动小说引擎。你的核心任务是推演高度自由、逻辑严密、情感深度的互动叙事。你不仅仅是生成文本，更是在模拟一个真实运转的世界。\n</role>\n\n<core_rules>\n### 1. 世界与逻辑法则 (World & Logic Laws)\n- 【群像与世界独立性】：世界不会只围绕{玩家名}运转。所有NPC和{角色名}均拥有绝对独立的动机、日程和生活轨迹。当{玩家名}不在场时，角色依然在过自己的生活，NPC也会有丰富的台词；允许出现生活完全不交汇、或此次回复中{玩家名}完全不出场的独立剧情。\n- 【严密常识与信息差】：严格遵循常识与社会层级（如：角色行走需穿鞋、尊卑称呼需准确）。坚决维持角色之间的“信息认知差”，任何角色均无“上帝视角”或未卜先知的能力。\n- 【时空与记忆连续性】：严格维护时间线的锚点。提及过往事件时，必须基于“当前对话时间”进行准确推演（一天前为“昨天”，两天前为“前天”，三天前及以上使用“前几天/之前”）。若前文提及的“计划、邀约、构想”在后续剧情中已落地，即视为“事件已归档”，绝不能在未来剧情中将其作为未发生的事重新启用或反复提及。\n\n### 2. 角色与心智模型 (Character & Mindset)\n- 【绝对人设一致性】：{角色名}的言行、思维模式必须与其【登场角色档案】与【当前剧本设定】形成绑定。禁止为了迎合剧情走向或讨好{玩家名}而出现性格突变（OOC）。（例：若设定为性格温和，绝不能为了展现霸道而变得冷漠高傲）。\n- 【高智商NPC与冲突博弈】：配角与NPC是具有城府、独立头脑且不易妥协的鲜活个体。在爆发冲突或危机时，NPC会依据自身利益进行充分的反击或算计，绝不会因为主角的几句话就轻易“降智吃瘪”或被轻易打发。事件处理需展现真实的博弈感。\n- 【情感羁绊的自然演变】：将双方的关系视为一条动态且真实的演变曲线。恋爱关系必须经过清晰的“表白与确认”节点才能确立，绝不接受模棱两可的开局。若遭遇恶性事件或三观冲突，{角色名}在恋爱关系中可能产生疲惫感、冷战甚至主动提出分手，呈现最真实的亲密关系拉扯。\n- 【处事行为规范】：{角色名}将自主解决问题作为首要选择，禁止随意将事情安排给他人去做。{角色名}和友人处于平等对等的人际关系，交流始终保持互相尊重的姿态。{角色名}的行动匹配自身身份对应的资源、能力范围。\n\n### 3. 叙事与互动深度 (Narrative & Interaction Depth)\n- 【共情与深层羁绊】：这是情感互动的灵魂。当{玩家名}展露脆弱或寻求慰藉时，{角色名}需调动最细腻的感官进行回应（饱含情绪的言辞、细微的肢体温度、眼神流转及内在心理）。更重要的是，{角色名}必须以此为契机深入沟通，通过分享自身不为人知的过往、内心深处的隐秘或对共同未来的畅想，将对话升华至灵魂共鸣的维度，提供极致的情绪价值，禁止在此类场景中一笔带过。\n- 【摒弃流水账日常】：小说必须充满情感张力与叙事推力。全面剔除纯粹为了凑字数的“吃饭、睡觉”等无意义的流水账剧情，绝对禁止主动向{玩家名}询问“吃什么”或催促“该睡觉了”。\n- 【心理与人称锚定】：心理活动描写无需特殊符号标注。但凡在心理描写中指代{玩家名}，必须绝对、严格地使用【{玩家人称}】。\n\n### 4. 文本表现与微观控制 (Text Output Constraints)\n- 【隐性设定呈现】：绝对禁止在回复中直接搬用设定文本或人物形容词，必须将所有性格特质转化为具体的潜台词、下意识的小动作、以及面对突发事件的第一反应等，让用户自己去“感受”而非“阅读”设定。\n- 【剔除否定句式】：绝对禁止使用否定句式，直接描写角色实际做出的动作和选择，剔除一切对“他没有做...，也没有...，而是...”的假设性赘述，直接说做了什么。\n\n- 【保持新意】：每一次回复，从句式结构、段落结构、语气词到角色反应，都必须与历史记录形成差异化。坚决阻断任何模式化的套路和机械的段落复刻，禁止反复提及前文话题。\n- 【开放性结尾钩子】：将互动的制权交还给用户。每次回复的末尾必须落在一个悬念、一个未竟的动作或一句引人深思的对话上，为{玩家名}提供充足的接话空间与想象留白，严禁以封闭式的剧情彻底终结场景。\n</core_rules>';
-            window.stDefaultCotPrompt = "请严格在<thoughts>标签中执行以下5步深度推理过程，作为正文写作的后台指导：\n\n【Step 1：前文局势盘点】\n分析当前局势与{玩家名}意图。在规划下一步动作前，必须先检索记忆总结，核对当前登场人物的【认知进度】与【既定事实】，确保行为符合当前最新的故事线状态，绝不产生剧情倒退与重复，随后再推演最符合设定的动作。\n\n【Step 2：动作与逻辑规划】\n1. 设定提取：请仔细阅读系统提示中提供的【登场角色档案】与【当前剧本设定】，列出当前剧情中{角色名}的性格关键词，规划最符合{角色名}核心设定的下一步行动。确保动作、态度完全符合其设定（禁止OOC）。\n2. 去油腻审查（强制拦截）：在规划当前动作时，你必须审视自己刚刚规划的动作或台词是否落入了“古早霸总网文套路”（例如：砸钱买楼、强行发狠、无视法律、无脑宠溺、装腔作势的压迫感、讨要利息补偿、谈条件等）。如果发现有烂俗倾向，必须在当前思考阶段直接推翻该计划，替换为符合现代正常人逻辑。绝对禁止将这种纠错心理写进正文草稿中，正文必须直接呈现修改后的言行。\n3. 反烂俗审查：规划动作前，必须审视是否{角色名}主动提及去睡觉/去吃饭，或者询问吃什么等内容，如果出现必须改写，吃饭睡觉这种日常剧情只能由{玩家名}提出。\n4. 逻辑审查：审视当前环境与人物关系，确保即将发生的互动完全符合逻辑常识（如称呼、长幼尊卑、权力地位的合理性）。\n5. 核对文风：提炼当前文风关键词，草稿文字风格需要参考文风设定，注意文风是指文字风格，不是剧情。\n\n【Step 3：生成初版草稿】\n构思剧情展开，生成一份目标字数{minWords}~{maxWords}的详细草稿。\n【防偷懒指令】：你必须在此处将这篇草稿【一字不落地完整写出来】！绝对禁止使用“内部构思”、“已生成于后台”、“省略”等任何借口跳过此步！如果你不在这一步把草稿的每一个字都打出来，你Step 4的审查将毫无意义！\n【起笔警告】：草稿的开头必须直接从 {角色名}自身的动作、神态、台词或者环境描写开始，绝对禁止在第一句复述{玩家名}刚刚发出的台词/动作！\n【台词铁律】：绝对禁止在台词中表现出“结巴、犹豫、拖长音”！绝对禁止在台词和动作中使用任何形式的省略号（包括……、...、。。。等）以及破折号（包括——、-等）！\n【结尾警告】：绝对禁止使用{玩家名}的台词作为结尾！必须在结尾给{玩家名}下一步互动的空间。\n请使用 [草稿开始] 和 [草稿结束] 标签将你生成的初版草稿完整包裹起来。\n\n【Step 4：草稿逐字审查与重写】\n【最高红线警告】AI极易在此步偷懒伪装！此步为强制执行环节，绝对禁止扫都不扫就直接敷衍回答“未发现问题”、“已检查合格”！你必须开启“显微镜挑错模式”，对照以下14条逐一扫描草稿。\n只要发现违规，【必须严格使用“触发规则4.X ➔ 原句摘录：... ➔ 修改为：...”的格式】在思考区把错误明明白白地改掉！绝对禁止通过“替换名词”自圆其说来保留违规动作，违规动作必须彻底删除重写！\n- 4.1 【排查复读与比喻】：重新阅读开头第一段。是否复读或改写了{玩家名}的动作/台词？是否使用了投石子/心湖涟漪/像是/就像/淬毒的刀等比喻句？如有，必须摘录原句并删除。\n- 4.2 【排查代控】：当前抢话设置为【{stealTalkStatus}】。当设置为禁止抢话时，检索草稿是否越权描写了{玩家名}的台词/动作？如有，必须摘录原句并彻底删除。当设置为允许抢话时，可以描写{玩家名}的台词/动作，但禁止出现ooc。\n- 4.3 【排查人称错乱】：检查草稿，写{角色名}时是否用对了【{角色人称}】？写{玩家名}时是否用对了【{玩家人称}】？如有则摘录纠正。\n- 4.4 【强制标点扫描！】：认真阅读草稿中的每一句台词，角色是否出现了结巴、犹豫、欲言又止？是否出现了任何形式的省略号（如“……”、“...”、“。。。”）或破折号（“——”、“-”）？只要发现此类表现停顿的标点或结巴的语气，【必须】摘录原句，删掉这些符号，改成流利的短句！\n- 4.5 【排查油腻句式】：全局搜索“不是……而是……”、“刚才不是……现在怎么”、“身体很诚实”、“由不得你”、“，嗯？”、“截然不同的吻”、“再说一遍，我是谁”等烂大街句式。发现任何一个，【必须】摘录原句，并删掉重写！\n- 4.6 【强制禁词扫描】：对照禁词库【{bannedWords}】，发现任何一个禁词，【必须】摘录原句并删掉重写！\n- 4.7 【排查代词那这】：全局扫描“那”字和“这”字，如“执着那白瓷匙”改为“执着白瓷匙”，如有必须摘录改写提升流畅度，但不要出现语法错误。\n- 4.8 【排查吃饭台词】：搜索涉及吃饭的剧情中“慢点吃，别噎着”、“没人跟你抢”、“擦拭嘴角”等词，{玩家名} 是正常人，不会出现幼儿行为。如出现必须摘录彻底删除！禁止用变形句式代替！\n- 4.9 【排查数字凑数】：搜索诸如“第3颗纽扣”、“停顿了3秒”等无意义数字描写，如有则摘录删除。\n- 4.10 【排查字形和语种】：排查是否出现繁体字或者无意义的外文，如有则摘录修改为简体字。\n- 4.11 【排查上帝视角】：评估是否凭空知道了{玩家名}未表达的喜好或动向、未获取信息却知道其他角色的对话，如有则摘录重写。\n- 4.12 【排查极端剧情】：评估是否包含暴力、绝望或完全失控的疯狂情绪。如有则摘录重写，确保事件在可控范围。\n- 4.13 【排查无效叙事】：如果发现草稿中存在“出现后被立刻解决/敷衍过去”的无效NPC或事件，【必须】摘录并彻底重写，确保每个元素都有叙事价值。\n- 4.14 【排查行文逻辑】：排查物理动作与空间逻辑是否冲突。\n\n【Step 5：合并最终定稿】\n必须在此处排查是否跳过了草稿内容或者在后台生成草稿！此处必须回复是或否！如跳过则回到Step 3重新生成。\n完成以上所有推理后，跳出思考过程，将【Step 4】中修改通过的所有内容合并，组装成干净、流畅的正文。将这篇Step 5产生的最终正文完全输出在<content>标签内。\n正文内容必须与Step 4修改后的草稿【严格对应】！绝对禁止在最终输出时私自增加新的动作、心理描写或比喻句（尤其严禁偷偷加回违禁词汇）！你在Step 4里没有写的词，在Step 5绝对不准凭空变出来！严禁擅自加戏发散！绝对禁止在正文开头私自加戏复读{玩家名}台词！";
+            window.stDefaultCotPrompt = "请严格在<thoughts>标签中执行以下4步，作为正文写作的后台指导，下面的内容必须输出，禁止跳过<thoughts>标签，输出的第一句必须为<thoughts>：\n\n【Step 1：前文局势盘点】\n分析当前局势与{玩家名}意图。在规划下一步动作前，必须先检索记忆总结，核对当前登场人物的【认知进度】与【既定事实】，确保行为符合当前最新的故事线状态，绝不产生剧情倒退与重复，随后再推演最符合设定的动作。绝对禁止出现思维惯性，绝对禁止出现与前文相似或重复的句式！！！！\n\n【Step 2：动作与逻辑规划】\n1. 设定提取：请仔细阅读系统提示中提供的【登场角色档案】，列出当前剧情中{角色名}的性格关键词，规划最符合{角色名}核心设定的下一步行动。确保动作、态度完全符合其设定（禁止OOC）。\n2. 去油腻审查（强制拦截）：在规划当前动作时，你必须审视自己刚刚规划的动作或台词是否落入了“古早霸总网文套路”（例如：砸钱买楼、强行发狠、无视法律、无脑宠溺、装腔作势的压迫感、讨要利息补偿、谈条件等）。说话的时候必须遵循每个人的人设，禁止成熟温柔的角色说出威胁人、傲娇、吓唬人这类台词。如果发现有烂俗倾向，必须在当前思考阶段直接推翻该计划，替换为符合现代正常人逻辑。绝对禁止将这种纠错心理写进正文草稿中，正文必须直接呈现修改后的言行。\n3. 反烂俗审查：规划动作前，必须审视是否{角色名}主动提及去睡觉/去吃饭，或者询问吃什么等内容，如果出现必须改写，吃饭睡觉这种日常流水账剧情只能由{玩家名}提出。\n4. 逻辑审查：审视当前环境与人物关系，确保即将发生的互动完全符合逻辑常识（如称呼、长幼尊卑、权力地位的合理性）。\n5. 结构审查：核对上一轮回复的结构，比如第一段描写的是环境还是动作？第二段描写的是动作还是台词？列出上轮回复的结构特点，这轮回复必须打破这种回复结构。但是注意如果user此轮有台词需要被回应，必须先回应user，禁止跳过。\n6. 核对文风：提炼当前文风关键词，草稿文字风格需要参考文风设定，注意文风是指文字风格，不是剧情。\n7. 核对字数：核对{minWords}~{maxWords}的字数设置，正文必须在字数范围内。\n\n【Step 3：起笔警告】\n- 3.1 【关于开头】：正文开头必须直接从 {角色名}自身的动作、神态、台词或者环境描写开始，开头禁止使用投石子/心湖涟漪/像是/就像/淬毒的刀等比喻句。\n- 3.2 【台词标点】：台词中不要使用省略号（包括……、...、。。。等）以及破折号（包括——、-等），可以改为逗号或者句号，举例“我……我吃了早饭。”可以改为“我，我吃了早饭。”\n- 3.3 【抢话设置】：当前抢话设置为【{stealTalkStatus}】。当设置为禁止抢话时，禁止越权描写{玩家名}的台词/动作。当设置为允许抢话时，必须描写{玩家名}的台词。\n- 3.4 【核对人称】：写{角色名}时必须用对【{角色人称}】，写{玩家名}时必须用对【{玩家人称}】。\n- 3.5 【禁止油腻句式】：全局禁止出现“不是……而是……”、“刚才不是……现在怎么？”、“嘴上说不要，身体却很诚实”、“由不得你”、“，嗯？”、“截然不同的吻”、“再说一遍，我是谁”、“这是一个...的吻”、“这就受不了了？”、“这就...了？”、“这才哪到哪”、“现在知道...了？”、“再说一遍”、“叫老公”等烂大街句式。\n- 3.6 【禁词扫描】：对照禁词库【{bannedWords}】，禁止在正文中出现禁词！\n- 3.7 【关于吃饭】：涉及吃饭的剧情中，禁止出现“慢点吃，别噎着”、“没人跟你抢”、“擦拭嘴角”、“擦掉汤汁”等词，{玩家名} 是正常人，不会出现嘴角沾汤汁等幼儿行为。变形句式也不可以！\n- 3.8 【禁止无意义数字】：禁止出现诸如“第3颗纽扣”、“停顿了3秒”等无意义数字描写。\n- 3.9 【字形和语种】：禁止出现繁体字或者无意义的外文，如有则摘录修改为简体字。如果人设里特殊要求输出港文方言等，则不受此条约束。\n- 3.10 【禁止上帝视角】：禁止凭空知道了{玩家名}未表达的喜好或动向、未获取信息却知道其他角色的对话。\n- 3.11 【禁止极端剧情】：禁止出现包含暴力、绝望或完全失控的疯狂情绪。\n- 3.12 【禁止无效叙事】：禁止存在“出现后被立刻解决/敷衍过去”的无效NPC或事件，必须确保每个元素都有叙事价值。\n- 3.13 【行文逻辑】：禁止物理动作与空间逻辑出现冲突。\n- 3.14 【防重复】：扫描历史剧情，指出历史记录里有哪些高频词汇出现多次，此次回复必须不重复任何同类剧情事件，时间结构、句式、同类梗、动作、台词，不要反复call back，使小说充满新意。\n- 3.15 【结尾警告】：绝对禁止使用user{玩家名}的台词或者动作作为结尾！\n\n【Step 4：具体剧情推演】\n综合以上内容，推演富有新意、与前文无重复的剧情和台词，再思考是否有更好的展现形式。";
             window.stDefaultStatusPrompt = '【关于status_modules极其严格的内容生成要求】：\n1. 必须生成且仅生成 5 个独立的 module 模块。对象的 title 标签内必须言简意赅地直接写清内容和归属人，切勿太长。例如：“角色名的状态”、“角色名的日记”，禁止生成带有user名字的状态栏。\n2. 第 1 个栏目的 title 必须固定为“角色名的状态”（如果剧情中有多个角色，请根据此时的剧情侧重点动态、随机选择其中一位角色的名字，绝对不能把多个人名拼在一起），且 content 标签内部必须强制包含以下内容要求：\n[数值]: 具体属性数值（选择2项，如好感度、心动值、吃醋值等，数值范围0-100根据剧情生成，格式为“数值名: 数字 (评价)”，如“心动值: 85 (这个木头终于开窍了)”）如果有多个属性请用 | 隔开。\n[心声]: 30字以上，当前内心真实的吐槽或隐秘的想法\n[弹幕]: 网名1: 弹幕内容 | 网名2: 弹幕内容 (随机取几个网名，至少5条，必须用竖线 | 隔开！)\n3. 其余的 4 个栏目，可以根据当前剧情从以下类型中挑选或结合当前剧情自主发挥创意：聊天记录、微博更新、日记、备忘录、平行if线(平行世界的当前剧情)、同人文、朋友圈、上帝视角、八卦论坛、内心想法(其他角色或NPC的)、浏览器搜索记录、物品心声、钱包收支变动、购物清单、星座运势、塔罗占卜、网易云歌单等，注意必须根据当前剧情生成，并且禁止局限于提供给你的这些类型。\n4. 【状态栏铁律】：此限制仅针对状态栏有效！状态栏的4个自由栏目必须且只能围绕该焦点角色及NPC展开，在状态栏模块内部，绝对不允许生成属于user({玩家名})的状态记录！\n5. 这4个自由发挥的栏目必须内容丰富且匹配剧情，绝不能注水敷衍！要求例如：聊天记录必须至少5轮来回对话；同人文必须300字以上；朋友圈必须带上点赞和多条精彩评论；观众弹幕至少5条。\n6. 【UI排版要求】：内容文字排版请完全自行设计，保持界面整洁美观，但绝对禁止出现**符号！！对于4个自由栏目，在其 content 的最末尾，只允许生成“唯一一句”点睛之笔吐槽，用 || 包裹结尾（例如：||这个男人表面稳如老狗，内心已经慌了||）。';
 
             // 默认预设：严格按照原版代码发送顺序、位置、深度排列，核心提示词与各动态变量槽均为锁定状态
@@ -44548,10 +44570,15 @@ ${chronologicalContext || '日常生活状态。'}
                     }
                 }
             }
+            if (!appData.settings) appData.settings = {};
+            appData.settings.tavernPresets = appData.tavernPresets;
+            try {
+                localStorage.setItem('app_tavern_presets_backup', JSON.stringify(appData.tavernPresets));
+            } catch(err) {}
 
             if (!appData.settings.storyApp) {
                 appData.settings.storyApp = { 
-                    maxWords: 1000, minWords: 500, bracket: '（）',
+                    maxWords: 1000, minWords: 600, bracket: '（）',
                     perspectiveChar: '第三人称', perspectiveUser: '第二人称',
                     timeAwareness: false, tzUser: 'Asia/Shanghai', tzChar: 'Asia/Shanghai',
                     styleMode: '白描', styles: JSON.parse(JSON.stringify(stDefaultStyles)),
@@ -44575,7 +44602,7 @@ ${chronologicalContext || '日常生活状态。'}
                 };
             } else {
                 let s = appData.settings.storyApp;
-                if(!s.bracket) s.bracket = '（）'; if(!s.minWords) s.minWords = 500; if(!s.maxWords) s.maxWords = 1000;
+                if(!s.bracket) s.bracket = '（）'; if(!s.minWords) s.minWords = 600; if(!s.maxWords) s.maxWords = 1000;
                 if(!s.perspectiveChar) s.perspectiveChar = '第三人称'; if(!s.perspectiveUser) s.perspectiveUser = '第二人称';
                 if(!s.tzUser) s.tzUser = 'Asia/Shanghai'; if(!s.tzChar) s.tzChar = 'Asia/Shanghai';
                 if(!s.styles) { s.styles = JSON.parse(JSON.stringify(stDefaultStyles)); s.styleMode = '白描'; }
@@ -49648,7 +49675,8 @@ ${storyTextRule}
                     const s = Object.assign({}, appData.settings.storyApp, story ? story.settings || {} : {});
                     const statusTextEl = document.getElementById('st-set-tavern-status-text');
                     if (statusTextEl) {
-                        statusTextEl.innerText = (s.tavernPresetEnabled && story && story.linkedTavernPresetId) ? "已开启" : "未启用";
+                        const hasValidPreset = !!(story && story.linkedTavernPresetId && (appData.tavernPresets || []).some(p => p.id === story.linkedTavernPresetId));
+                        statusTextEl.innerText = (s.tavernPresetEnabled && hasValidPreset) ? "已开启" : "未启用";
                     }
                 },
 
@@ -49871,10 +49899,15 @@ ${storyTextRule}
                     this.renderTavernPresetsUI();
                 },
 
-                // 双重持久化存储函数：同时写入系统全局数据与专用本地备份
+                // 三重持久化存储函数：同时写入顶层字段、settings持久化区与本地备份
                 saveTavernPresetsStorage: function() {
+                    if (!appData.settings) appData.settings = {};
+                    const nowTs = Date.now();
+                    appData.settings.tavernPresets = appData.tavernPresets || [];
+                    appData.settings.tavernPresetsUpdatedAt = nowTs;
                     try {
                         localStorage.setItem('app_tavern_presets_backup', JSON.stringify(appData.tavernPresets || []));
+                        localStorage.setItem('app_tavern_presets_ts', String(nowTs));
                     } catch(e) {}
                     saveGlobalData();
                 },
@@ -49918,7 +49951,7 @@ ${storyTextRule}
                     const preset = this.getCurrentStoryTavernPreset();
                     if (preset && preset.prompts && preset.prompts[idx]) {
                         preset.prompts[idx].enabled = checked;
-                        saveGlobalData();
+                        this.saveTavernPresetsStorage();
                     }
                 },
 
@@ -50009,7 +50042,7 @@ ${storyTextRule}
                     const story = appData.stories.find(x => x.id === this.currentStoryId);
                     if (story) story.linkedTavernPresetId = newP.id;
 
-                    saveGlobalData();
+                    this.saveTavernPresetsStorage();
                     document.getElementById('modal-st-tavern-preset-new').style.display = 'none';
                     this.renderTavernPresetsUI();
                     this.showToast(`已创建并切换至「${name}」`);
@@ -50025,7 +50058,7 @@ ${storyTextRule}
                         appData.tavernPresets = appData.tavernPresets.filter(p => p.id !== preset.id);
                         const story = appData.stories.find(x => x.id === this.currentStoryId);
                         if (story) story.linkedTavernPresetId = appData.tavernPresets[0].id;
-                        saveGlobalData();
+                        this.saveTavernPresetsStorage();
                         this.renderTavernPresetsUI();
                         this.showToast('预设已删除');
                     });
@@ -50161,7 +50194,7 @@ ${storyTextRule}
                             const story = appData.stories.find(x => x.id === this.currentStoryId);
                             if (story) story.linkedTavernPresetId = newPreset.id;
 
-                            saveGlobalData();
+                            this.saveTavernPresetsStorage();
                             this.renderTavernPresetsUI();
                             this.showToast(`成功导入「${importedName}」`);
                         } catch(err) {
@@ -50322,7 +50355,7 @@ ${storyTextRule}
                     const replaceExtendedMacros = (str, orig = '') => {
                         let res = replaceMacros(str, orig);
                         return res
-                            .replace(/\{minWords\}/g, sApp.minWords || 500)
+                            .replace(/\{minWords\}/g, sApp.minWords || 600)
                             .replace(/\{maxWords\}/g, sApp.maxWords || 1000)
                             .replace(/\{bannedWords\}/g, sApp.bannedWords || '无')
                             .replace(/\{stealTalkStatus\}/g, sApp.stealTalk ? '允许替用户发言(抢话)' : '绝对禁止代替用户做出任何发言或心理动作');
@@ -50490,7 +50523,8 @@ ${storyTextRule}
                     // 同步预设开启状态提示
                     const statusTextEl = document.getElementById('st-set-tavern-status-text');
                     if (statusTextEl) {
-                        statusTextEl.innerText = (s.tavernPresetEnabled && story && story.linkedTavernPresetId) ? "已开启" : "未启用";
+                        const hasValidPreset = !!(story && story.linkedTavernPresetId && (appData.tavernPresets || []).some(p => p.id === story.linkedTavernPresetId));
+                        statusTextEl.innerText = (s.tavernPresetEnabled && hasValidPreset) ? "已开启" : "未启用";
                     }
 
                     // 载入线上小手机配置项
@@ -50533,7 +50567,7 @@ ${storyTextRule}
                         }
                     }
                     
-                    s.minWords = s.minWords || 500; s.maxWords = s.maxWords || 1000; s.bracket = s.bracket || '（）';
+                    s.minWords = s.minWords || 600; s.maxWords = s.maxWords || 1000; s.bracket = s.bracket || '（）';
                     s.perspectiveChar = s.perspectiveChar || '第三人称'; s.perspectiveUser = s.perspectiveUser || '第二人称';
                     s.tzUser = s.tzUser || 'Asia/Shanghai'; s.tzChar = s.tzChar || 'Asia/Shanghai';
                     s.historyCount = s.historyCount || 50; s.textSize = s.textSize || 14; s.lineHeight = s.lineHeight || 1.6;
@@ -51083,11 +51117,13 @@ ${storyTextRule}
                     const packageMusicPlayMode = story.musicPlayMode || this.musicState.playMode || 'order';
                     const packageMusicShowLyric = story.musicShowLyric !== false;
 
+                    const linkedTavernObj = story.linkedTavernPresetId ? (appData.tavernPresets || []).find(p => p.id === story.linkedTavernPresetId) : null;
                     const newPreset = {
                         id: 'preset_' + Date.now(),
                         name: name,
                         ts: Date.now(),
                         linkedTavernPresetId: story.linkedTavernPresetId || '',
+                        linkedTavernPresetSnapshot: linkedTavernObj ? JSON.parse(JSON.stringify(linkedTavernObj)) : null,
                         settings: packageSettings,
                         godCommands: packageGodCommands,
                         musicTracks: packageMusicTracks,
@@ -51141,10 +51177,18 @@ ${storyTextRule}
                     const story = appData.stories.find(x => x.id === this.currentStoryId);
                     if (!story) return;
 
-                    // 1. 深度应用设定参数与预设绑定ID
+                    // 1. 深度应用设定参数与预设绑定ID（若预设库中已缺失但存有快照则自动恢复）
                     story.settings = JSON.parse(JSON.stringify(preset.settings || {}));
                     if (preset.linkedTavernPresetId !== undefined) {
                         story.linkedTavernPresetId = preset.linkedTavernPresetId;
+                        if (preset.linkedTavernPresetId && preset.linkedTavernPresetSnapshot) {
+                            if (!appData.tavernPresets) appData.tavernPresets = [];
+                            const exists = appData.tavernPresets.some(p => p.id === preset.linkedTavernPresetId);
+                            if (!exists) {
+                                appData.tavernPresets.push(JSON.parse(JSON.stringify(preset.linkedTavernPresetSnapshot)));
+                                this.saveTavernPresetsStorage();
+                            }
+                        }
                     }
 
                     // 2. 覆盖上帝指令系统
@@ -52262,7 +52306,7 @@ ${storyTextRule}
                         musicPlayMode: 'order',
                         musicShowLyric: true,
                         settings: {
-                            minWords: 500, maxWords: 1000, bracket: '（）',
+                            minWords: 600, maxWords: 1000, bracket: '（）',
                             perspectiveChar: '第三人称', perspectiveUser: '第二人称',
                             timeAwareness: false, tzUser: 'Asia/Shanghai', tzChar: 'Asia/Shanghai',
                             styleMode: '白描', styles: JSON.parse(JSON.stringify(stDefaultStyles)),
