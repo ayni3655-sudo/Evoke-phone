@@ -46594,15 +46594,15 @@ ${chronologicalContext || '日常生活状态。'}
                         let actionButtons = '';
                         if (branch.isCurrent) {
                             actionButtons = `
-                                <button onclick="window.StoryApp.exportChatBranch('current_active')" style="margin-right:auto; background:#fff; color:#555; border:1px solid #e0e0e0; padding:5px 14px; border-radius:6px; font-size:12.5px; font-weight:500; cursor:pointer;">导出</button>
-                                <button onclick="document.getElementById('modal-story-manage-chats').style.display='none'" style="background:#f0f0f0; color:#555; border:1px solid #f0f0f0; padding:5px 14px; border-radius:6px; font-size:12.5px; font-weight:500; cursor:pointer;">继续</button>
-                                <button onclick="window.StoryApp.deleteChatBranch('current_active')" style="background:transparent; color:#ff3b30; border:1px solid #ff3b30; padding:5px 14px; border-radius:6px; font-size:12.5px; font-weight:500; cursor:pointer;">清空</button>
+                                <button type="button" onclick="event.stopPropagation(); window.StoryApp.exportChatBranch('current_active')" style="margin-right:auto; background:#fff; color:#555; border:1px solid #e0e0e0; padding:5px 14px; border-radius:6px; font-size:12.5px; font-weight:500; cursor:pointer;">导出</button>
+                                <button type="button" onclick="event.stopPropagation(); document.getElementById('modal-story-manage-chats').style.display='none'" style="background:#f0f0f0; color:#555; border:1px solid #f0f0f0; padding:5px 14px; border-radius:6px; font-size:12.5px; font-weight:500; cursor:pointer;">继续</button>
+                                <button type="button" onclick="event.stopPropagation(); window.StoryApp.deleteChatBranch('current_active')" style="background:transparent; color:#ff3b30; border:1px solid #ff3b30; padding:5px 14px; border-radius:6px; font-size:12.5px; font-weight:500; cursor:pointer;">清空</button>
                             `;
                         } else {
                             actionButtons = `
-                                <button onclick="window.StoryApp.exportChatBranch('${branch.id}')" style="margin-right:auto; background:#fff; color:#555; border:1px solid #e0e0e0; padding:5px 14px; border-radius:6px; font-size:12.5px; font-weight:500; cursor:pointer;">导出</button>
-                                <button onclick="window.StoryApp.switchChatBranch('${branch.id}')" style="background:#262626; color:#fff; border:1px solid #262626; padding:5px 14px; border-radius:6px; font-size:12.5px; font-weight:500; cursor:pointer;">进入</button>
-                                <button onclick="window.StoryApp.deleteChatBranch('${branch.id}')" style="background:transparent; color:#ff3b30; border:1px solid #ff3b30; padding:5px 14px; border-radius:6px; font-size:12.5px; font-weight:500; cursor:pointer;">删除</button>
+                                <button type="button" onclick="event.stopPropagation(); window.StoryApp.exportChatBranch('${branch.id}')" style="margin-right:auto; background:#fff; color:#555; border:1px solid #e0e0e0; padding:5px 14px; border-radius:6px; font-size:12.5px; font-weight:500; cursor:pointer;">导出</button>
+                                <button type="button" onclick="event.stopPropagation(); window.StoryApp.switchChatBranch('${branch.id}')" style="background:#262626; color:#fff; border:1px solid #262626; padding:5px 14px; border-radius:6px; font-size:12.5px; font-weight:500; cursor:pointer;">进入</button>
+                                <button type="button" onclick="event.stopPropagation(); window.StoryApp.deleteChatBranch('${branch.id}')" style="background:transparent; color:#ff3b30; border:1px solid #ff3b30; padding:5px 14px; border-radius:6px; font-size:12.5px; font-weight:500; cursor:pointer;">删除</button>
                             `;
                         }
 
@@ -46621,6 +46621,63 @@ ${chronologicalContext || '日常生活状态。'}
                     ctn.innerHTML = html;
 
                     document.getElementById('modal-story-manage-chats').style.display = 'flex';
+                },
+
+                exportChatBranch: function(branchId) {
+                    const story = appData.stories.find(x => x.id === this.currentStoryId);
+                    if (!story) return;
+
+                    let targetHistory = [];
+                    let branchLabel = '';
+                    if (branchId === 'current_active') {
+                        targetHistory = story.history || [];
+                        branchLabel = '当前窗口';
+                    } else {
+                        const branch = (story.branches || []).find(b => b.id === branchId);
+                        if (!branch) return this.showToast('未找到该聊天窗口存档');
+                        targetHistory = branch.history || [];
+                        const d = new Date(branch.ts || Date.now());
+                        branchLabel = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}_${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}`;
+                    }
+
+                    const chapterBodies = [];
+                    targetHistory.forEach(entry => {
+                        if (entry && typeof entry === 'object' && entry.v === 2 && !entry.isUser && entry.type !== 'system' && !entry.isGeneratingSwipe) {
+                            const curSwipe = (entry.swipes && entry.swipes.length > 0)
+                                ? entry.swipes[entry.swipeIdx || 0]
+                                : entry;
+                            const bodyText = (curSwipe && curSwipe.body)
+                                ? String(curSwipe.body).replace(/\r\n/g, '\n').trim()
+                                : '';
+                            if (bodyText) {
+                                chapterBodies.push(bodyText);
+                            }
+                        }
+                    });
+
+                    if (chapterBodies.length === 0) {
+                        return this.showToast('该聊天窗口暂无可导出的正文内容');
+                    }
+
+                    const exportText = chapterBodies.join('\n\n');
+                    const safeStoryName = String(story.name || '故事导出').replace(/[\\/:*?"<>|]/g, '_');
+                    const fileName = `${safeStoryName}_${branchLabel}.txt`;
+
+                    try {
+                        const blob = new Blob([exportText], { type: 'text/plain;charset=utf-8' });
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = fileName;
+                        link.style.display = 'none';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        setTimeout(() => URL.revokeObjectURL(url), 1000);
+                        this.showToast('导出成功，正在下载 TXT 文件');
+                    } catch (err) {
+                        this.showToast('导出失败: ' + err.message);
+                    }
                 },
 
                 switchChatBranch: function(branchId) {
