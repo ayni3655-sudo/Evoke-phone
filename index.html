@@ -42459,10 +42459,10 @@ ${chronologicalContext || '日常生活状态。'}
                 </div>
             </div>
 
-            <div id="modal-story-manage-chats" class="ins-modal" style="z-index: 300; background:rgba(0,0,0,0.5); display:none;">
-                <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:#fff; border-radius:16px; width:85%; max-width:340px; box-shadow:0 10px 30px rgba(0,0,0,0.2); display:flex; flex-direction:column; overflow:hidden; max-height:70vh;">
+            <div id="modal-story-manage-chats" class="ins-modal" style="z-index: 300; background:rgba(0,0,0,0.5); display:none;" onclick="if(event.target===this) this.style.display='none';">
+                <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:#fff; border-radius:16px; width:85%; max-width:340px; box-shadow:0 10px 30px rgba(0,0,0,0.2); display:flex; flex-direction:column; overflow:hidden; max-height:70vh;" onclick="event.stopPropagation()">
                     <div style="padding:16px; font-size:16px; font-weight:600; text-align:center; border-bottom:0.5px solid #f0f0f0; color:#262626;">聊天分支管理</div>
-                    <div id="story-manage-chats-list" style="overflow-y:auto; padding:8px 0; flex:1;"></div>
+                    <div id="story-manage-chats-list" style="overflow-y:auto; padding:0; flex:1;"></div>
                     <div style="display:flex; border-top:0.5px solid #f0f0f0; flex-shrink:0;">
                         <div onclick="document.getElementById('modal-story-manage-chats').style.display='none'" style="flex:1; padding:14px; text-align:center; color:#8e8e8e; cursor:pointer; font-size:15px;">关闭</div>
                     </div>
@@ -46550,67 +46550,76 @@ ${chronologicalContext || '日常生活状态。'}
                     if (!story) return;
                     const ctn = document.getElementById('story-manage-chats-list');
                     ctn.innerHTML = '';
-                    
+
                     story.branches = story.branches || [];
-                    
-                    // 【核心改动】：将当前活跃的聊天记录与历史保存的记录合并成一个大列表进行展示
+
                     let displayList = [];
-                    
-                    // 1. 加入当前正在操作的活跃聊天
                     displayList.push({
                         isCurrent: true,
                         id: 'current_active',
                         ts: Date.now(),
                         history: story.history || []
                     });
-                    
-                    // 2. 加入过往的后台休眠聊天（倒序排序，越新存的越靠前）
                     let sortedBranches = [...story.branches].reverse();
                     displayList = displayList.concat(sortedBranches);
 
+                    const escapeHtml = (str) => String(str || '')
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;');
+
                     let html = '';
                     displayList.forEach(branch => {
+                        let hist = branch.history || [];
+                        let chapCount = hist.filter(m => m && !m.isUser && m.v === 2 && m.type !== 'system').length;
+
                         let lastMsgText = '暂无记录 (新开局)';
-                        if (branch.history && branch.history.length > 0) {
-                            let lastAi = [...branch.history].reverse().find(m => !m.isUser && m.v === 2 && m.type !== 'system');
-                            if (lastAi && lastAi.body) {
-                                lastMsgText = String(lastAi.body).replace(/<[^>]+>/g, '').substring(0, 18) + '...';
+                        if (hist.length > 0) {
+                            let lastAi = [...hist].reverse().find(m => m && !m.isUser && m.v === 2 && m.type !== 'system');
+                            if (lastAi) {
+                                let curSw = (lastAi.swipes && lastAi.swipes.length > 0) ? lastAi.swipes[lastAi.swipeIdx || 0] : lastAi;
+                                let rawText = String((curSw && curSw.body) || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+                                if (rawText) lastMsgText = escapeHtml(rawText.substring(0, 120));
                             } else {
-                                lastMsgText = String(branch.history[branch.history.length - 1].body).replace(/<[^>]+>/g, '').substring(0, 18) + '...';
+                                let rawText = String((hist[hist.length - 1] && hist[hist.length - 1].body) || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+                                if (rawText) lastMsgText = escapeHtml(rawText.substring(0, 120));
                             }
                         }
+
                         let timeStr = branch.isCurrent ? '当前界面' : this.formatFullZhDateTime(branch.ts);
-                        
+                        let currentBadge = branch.isCurrent
+                            ? `<span style="background:#e8f5e9; color:#4caf50; font-size:10px; padding:1px 6px; border-radius:4px; margin-left:6px; vertical-align:middle;">当前</span>`
+                            : '';
+
                         let actionButtons = '';
                         if (branch.isCurrent) {
                             actionButtons = `
-                                <button onclick="document.getElementById('modal-story-manage-chats').style.display='none'" style="background:#f0f0f0; color:#555; border:none; padding:6px 16px; border-radius:6px; font-size:13px; font-weight:500; cursor:pointer;">继续</button>
-                                <button onclick="window.StoryApp.deleteChatBranch('current_active')" style="background:transparent; color:#ff3b30; border:1px solid #ff3b30; padding:5px 15px; border-radius:6px; font-size:13px; font-weight:500; cursor:pointer;">清空</button>
+                                <button onclick="window.StoryApp.exportChatBranch('current_active')" style="margin-right:auto; background:#fff; color:#555; border:1px solid #e0e0e0; padding:5px 14px; border-radius:6px; font-size:12.5px; font-weight:500; cursor:pointer;">导出</button>
+                                <button onclick="document.getElementById('modal-story-manage-chats').style.display='none'" style="background:#f0f0f0; color:#555; border:1px solid #f0f0f0; padding:5px 14px; border-radius:6px; font-size:12.5px; font-weight:500; cursor:pointer;">继续</button>
+                                <button onclick="window.StoryApp.deleteChatBranch('current_active')" style="background:transparent; color:#ff3b30; border:1px solid #ff3b30; padding:5px 14px; border-radius:6px; font-size:12.5px; font-weight:500; cursor:pointer;">清空</button>
                             `;
                         } else {
                             actionButtons = `
-                                <button onclick="window.StoryApp.switchChatBranch('${branch.id}')" style="background:#262626; color:#fff; border:none; padding:6px 16px; border-radius:6px; font-size:13px; font-weight:500; cursor:pointer;">进入</button>
-                                <button onclick="window.StoryApp.deleteChatBranch('${branch.id}')" style="background:transparent; color:#ff3b30; border:1px solid #ff3b30; padding:5px 15px; border-radius:6px; font-size:13px; font-weight:500; cursor:pointer;">删除</button>
+                                <button onclick="window.StoryApp.exportChatBranch('${branch.id}')" style="margin-right:auto; background:#fff; color:#555; border:1px solid #e0e0e0; padding:5px 14px; border-radius:6px; font-size:12.5px; font-weight:500; cursor:pointer;">导出</button>
+                                <button onclick="window.StoryApp.switchChatBranch('${branch.id}')" style="background:#262626; color:#fff; border:1px solid #262626; padding:5px 14px; border-radius:6px; font-size:12.5px; font-weight:500; cursor:pointer;">进入</button>
+                                <button onclick="window.StoryApp.deleteChatBranch('${branch.id}')" style="background:transparent; color:#ff3b30; border:1px solid #ff3b30; padding:5px 14px; border-radius:6px; font-size:12.5px; font-weight:500; cursor:pointer;">删除</button>
                             `;
                         }
 
-                        let currentBadge = branch.isCurrent ? `<span style="background:#e8f5e9; color:#4caf50; font-size:10px; padding:2px 6px; border-radius:4px; margin-left:8px; vertical-align:middle;">当前</span>` : '';
-
                         html += `
-                        <div class="ins-item" style="border-bottom:0.5px solid #f0f0f0; padding:16px 16px; flex-direction: column; align-items: stretch; gap: 10px; ${branch.isCurrent ? 'background:#fafafa;' : ''}">
-                            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                                <div style="flex:1;">
-                                    <div style="font-size:12px; color:#a3a3a3; margin-bottom:6px;">存档时间：${timeStr}${currentBadge}</div>
-                                    <div style="font-size:14px; color:#262626; line-height:1.5;">${lastMsgText}</div>
-                                </div>
-                                <div style="display:flex; flex-direction:column; gap:8px; margin-left:14px; flex-shrink: 0;">
-                                    ${actionButtons}
-                                </div>
+                        <div class="ins-item" style="border-bottom:0.5px solid #f0f0f0; padding:14px 16px; flex-direction:column; align-items:stretch; gap:8px; ${branch.isCurrent ? 'background:#fafafa;' : 'background:#fff;'}">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <div style="font-size:12px; color:#a3a3a3;">存档时间：${timeStr}${currentBadge}</div>
+                                <div style="font-size:11px; color:#b3b3b3;">共 ${chapCount} 章</div>
+                            </div>
+                            <div style="font-size:14px; color:#262626; line-height:1.5; word-break:break-all; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; text-overflow:ellipsis;">${lastMsgText}</div>
+                            <div style="display:flex; align-items:center; gap:8px; margin-top:4px;">
+                                ${actionButtons}
                             </div>
                         </div>`;
                     });
                     ctn.innerHTML = html;
-                    
+
                     document.getElementById('modal-story-manage-chats').style.display = 'flex';
                 },
 
